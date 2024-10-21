@@ -19,6 +19,7 @@
 #include "storage/index/generic_key.h"
 
 namespace bustub {
+enum class BtreeAccessType { Search, Insert, Delete };
 
 #define MappingType std::pair<KeyType, ValueType>
 
@@ -46,15 +47,16 @@ class BPlusTreePage {
   ~BPlusTreePage() = delete;
 
   auto IsLeafPage() const -> bool;
-  void SetPageType(IndexPageType page_type);
-
+  auto IsSafe(BtreeAccessType access_type) const -> bool;
   auto GetSize() const -> int;
-  void SetSize(int size);
-  void ChangeSizeBy(int amount);
-
   auto GetMaxSize() const -> int;
-  void SetMaxSize(int max_size);
   auto GetMinSize() const -> int;
+
+  void SetPageType(IndexPageType page_type);
+  void SetSize(int size);
+  void IncreaseSize(int amount);
+  void ChangeSizeBy(int amount);
+  void SetMaxSize(int max_size);
 
  private:
   // Member variables, attributes that both internal and leaf page share

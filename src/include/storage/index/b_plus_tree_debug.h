@@ -38,29 +38,45 @@ INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::InsertFromFile(const std::filesystem::path &file_name) {
   int64_t key;
   std::ifstream input(file_name);
-  while (input) {
-    input >> key;
-
+  while (input >> key) {
     KeyType index_key;
     index_key.SetFromInteger(key);
     RID rid(key);
     Insert(index_key, rid);
   }
 }
-/*
- * This method is used for test only
- * Read data from file and remove one by one
- */
+
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::RemoveFromFile(const std::filesystem::path &file_name) {
   int64_t key;
   std::ifstream input(file_name);
-  while (input) {
-    input >> key;
+  while (input >> key) {
     KeyType index_key;
     index_key.SetFromInteger(key);
     Remove(index_key);
   }
+}
+
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::filesystem::path &outf) {
+  if (IsEmpty()) {
+    LOG_WARN("Drawing an empty tree");
+    return;
+  }
+
+  std::ofstream out(outf);
+  if (!out.is_open()) {
+    LOG_ERROR("Failed to open the file");
+    return;
+  }
+
+  out << "digraph G {" << std::endl;
+  auto root_page_id = GetRootPageId();
+  auto guard = bpm->ReadPage(root_page_id);
+  ToGraph(guard.GetPageId(), guard.template As<BPlusTreePage>(), out);
+  out << "}" << std::endl;
+  out.close();
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -95,40 +111,37 @@ void BPLUSTREE_TYPE::PrintTree(page_id_t page_id, const BPlusTreePage *page) {
 
     // Print the contents of the internal page.
     std::cout << "Contents: ";
-    for (int i = 0; i < internal->GetSize(); i++) {
-      if (i == 0) {
-        std::cout << internal->ValueAt(i);
-      } else {
-        std::cout << internal->KeyAt(i) << ": " << internal->ValueAt(i);
-      }
-      if ((i + 1) < internal->GetSize()) {
+    for (int i = 0; i < internal->GetSize() + 1; i++) {
+      std::cout << internal->KeyAt(i) << ": " << internal->ValueAt(i);
+      if ((i + 1) < internal->GetSize() + 1) {
         std::cout << ", ";
       }
     }
     std::cout << std::endl;
     std::cout << std::endl;
-    for (int i = 0; i < internal->GetSize(); i++) {
+    for (int i = 0; i < internal->GetSize() + 1; i++) {
       auto guard = bpm_->ReadPage(internal->ValueAt(i));
       PrintTree(guard.GetPageId(), guard.template As<BPlusTreePage>());
     }
   }
 }
 
+
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::filesystem::path &outf) {
+auto BPLUSTREE_TYPE::DrawBPlusTree() -> std::string {
   if (IsEmpty()) {
-    LOG_WARN("Drawing an empty tree");
-    return;
+    return "()";
   }
 
-  std::ofstream out(outf);
-  out << "digraph G {" << std::endl;
-  auto root_page_id = GetRootPageId();
-  auto guard = bpm->ReadPage(root_page_id);
-  ToGraph(guard.GetPageId(), guard.template As<BPlusTreePage>(), out);
-  out << "}" << std::endl;
-  out.close();
+  PrintableBPlusTree p_root = ToPrintableBPlusTree(GetRootPageId());
+  std::ostringstream out_buf;
+  p_root.Print(out_buf);
+
+  return out_buf.str();
 }
+
+
+
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out) {
@@ -168,12 +181,12 @@ void BPLUSTREE_TYPE::ToGraph(page_id_t page_id, const BPlusTreePage *page, std::
     // Print data of the node
     out << "label=<<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\">\n";
     // Print data
-    out << "<TR><TD COLSPAN=\"" << inner->GetSize() << "\">P=" << page_id << "</TD></TR>\n";
-    out << "<TR><TD COLSPAN=\"" << inner->GetSize() << "\">"
-        << "max_size=" << inner->GetMaxSize() << ",min_size=" << inner->GetMinSize() << ",size=" << inner->GetSize()
+    out << "<TR><TD COLSPAN=\"" << inner->GetSize() + 1 << "\">P=" << page_id << "</TD></TR>\n";
+    out << "<TR><TD COLSPAN=\"" << inner->GetSize() + 1 << "\">"
+        << "max_size=" << inner->GetMaxSize() << ",min_size=" << inner->GetMinSize() << ",size=" << inner->GetSize() + 1
         << "</TD></TR>\n";
     out << "<TR>";
-    for (int i = 0; i < inner->GetSize(); i++) {
+    for (int i = 0; i < inner->GetSize() + 1; i++) {
       out << "<TD PORT=\"p" << inner->ValueAt(i) << "\">";
       if (i > 0) {
         out << inner->KeyAt(i);
@@ -186,7 +199,7 @@ void BPLUSTREE_TYPE::ToGraph(page_id_t page_id, const BPlusTreePage *page, std::
     // Print table end
     out << "</TABLE>>];\n";
     // Print leaves
-    for (int i = 0; i < inner->GetSize(); i++) {
+    for (int i = 0; i < inner->GetSize() + 1; i++) {
       auto child_guard = bpm_->ReadPage(inner->ValueAt(i));
       auto child_page = child_guard.template As<BPlusTreePage>();
       ToGraph(child_guard.GetPageId(), child_page, out);
@@ -208,18 +221,9 @@ void BPLUSTREE_TYPE::ToGraph(page_id_t page_id, const BPlusTreePage *page, std::
   }
 }
 
-INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::DrawBPlusTree() -> std::string {
-  if (IsEmpty()) {
-    return "()";
-  }
 
-  PrintableBPlusTree p_root = ToPrintableBPlusTree(GetRootPageId());
-  std::ostringstream out_buf;
-  p_root.Print(out_buf);
 
-  return out_buf.str();
-}
+
 
 /*
  * This method is used for test only
@@ -248,6 +252,7 @@ void BPLUSTREE_TYPE::BatchOpsFromFile(const std::filesystem::path &file_name) {
   }
 }
 
+
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree {
   auto root_page_guard = bpm_->ReadPage(root_id);
@@ -266,7 +271,7 @@ auto BPLUSTREE_TYPE::ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTr
   auto internal_page = root_page_guard.template As<InternalPage>();
   proot.keys_ = internal_page->ToString();
   proot.size_ = 0;
-  for (int i = 0; i < internal_page->GetSize(); i++) {
+  for (int i = 0; i < internal_page->GetSize() + 1; i++) {
     page_id_t child_id = internal_page->ValueAt(i);
     PrintableBPlusTree child_node = ToPrintableBPlusTree(child_id);
     proot.size_ += child_node.size_;

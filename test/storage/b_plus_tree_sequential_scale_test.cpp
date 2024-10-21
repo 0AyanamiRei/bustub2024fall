@@ -27,7 +27,7 @@ using bustub::DiskManagerUnlimitedMemory;
 /**
  * (Fall 2024) You should pass this test after finishing insertion and point search.
  */
-TEST(BPlusTreeTests, DISABLED_ScaleTest) {  // NOLINT
+TEST(BPlusTreeTests, ScaleTest) {  // NOLINT
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -43,7 +43,7 @@ TEST(BPlusTreeTests, DISABLED_ScaleTest) {  // NOLINT
   GenericKey<8> index_key;
   RID rid;
 
-  int64_t scale = 5000;
+  int64_t scale = 20000;
   std::vector<int64_t> keys(scale);
   std::iota(keys.begin(), keys.end(), 1);
 

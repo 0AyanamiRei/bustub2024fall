@@ -67,7 +67,8 @@ class ReadPageGuard {
   /** @brief Only the buffer pool manager is allowed to construct a valid `ReadPageGuard.` */
   explicit ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame, std::shared_ptr<LRUKReplacer> replacer,
                          std::shared_ptr<std::mutex> bpm_latch);
-
+  void RLatch();
+  void RUnLatch();
   /** @brief The page ID of the page we are guarding. */
   page_id_t page_id_;
 
@@ -147,17 +148,24 @@ class WritePageGuard {
   auto operator=(const WritePageGuard &) -> WritePageGuard & = delete;
   WritePageGuard(WritePageGuard &&that) noexcept;
   auto operator=(WritePageGuard &&that) noexcept -> WritePageGuard &;
+
+  void WLatch();
+  void WUnLatch();
+
   auto GetPageId() const -> page_id_t;
   auto GetData() const -> const char *;
+  auto GetDataMut() -> char *;
+
   template <class T>
   auto As() const -> const T * {
     return reinterpret_cast<const T *>(GetData());
   }
-  auto GetDataMut() -> char *;
+
   template <class T>
   auto AsMut() -> T * {
     return reinterpret_cast<T *>(GetDataMut());
   }
+
   auto IsDirty() const -> bool;
   void Drop();
   ~WritePageGuard();
@@ -169,40 +177,9 @@ class WritePageGuard {
 
   /** @brief The page ID of the page we are guarding. */
   page_id_t page_id_;
-
-  /**
-   * @brief The frame that holds the page this guard is protecting.
-   *
-   * Almost all operations of this page guard should be done via this shared pointer to a `FrameHeader`.
-   */
   std::shared_ptr<FrameHeader> frame_;
-
-  /**
-   * @brief A shared pointer to the buffer pool's replacer.
-   *
-   * Since the buffer pool cannot know when this `WritePageGuard` gets destructed, we maintain a pointer to the buffer
-   * pool's replacer in order to set the frame as evictable on destruction.
-   */
   std::shared_ptr<LRUKReplacer> replacer_;
-
-  /**
-   * @brief A shared pointer to the buffer pool's latch.
-   *
-   * Since the buffer pool cannot know when this `WritePageGuard` gets destructed, we maintain a pointer to the buffer
-   * pool's latch for when we need to update the frame's eviction state in the buffer pool replacer.
-   */
   std::shared_ptr<std::mutex> bpm_latch_;
-
-  /**
-   * @brief The validity flag for this `WritePageGuard`.
-   *
-   * Since we must allow for the construction of invalid page guards (see the documentation above), we must maintain
-   * some sort of state that tells us if this page guard is valid or not. Note that the default constructor will
-   * automatically set this field to `false`.
-   *
-   * If we did not maintain this flag, then the move constructor / move assignment operators could attempt to destruct
-   * or `Drop()` invalid members, causing a segmentation fault.
-   */
   bool is_valid_{false};
 
   /**

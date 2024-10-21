@@ -19,6 +19,9 @@
 
 namespace bustub {
 
+using std::cout;
+using std::endl;
+
 template <typename KeyType, typename KeyValue, typename KeyComparator>
 bool TreeValuesMatch(BPlusTree<KeyType, KeyValue, KeyComparator> &tree, std::vector<int64_t> &inserted,
                      std::vector<int64_t> &deleted) {
@@ -29,6 +32,7 @@ bool TreeValuesMatch(BPlusTree<KeyType, KeyValue, KeyComparator> &tree, std::vec
     index_key.SetFromInteger(key);
     tree.GetValue(index_key, &rids);
     if (rids.size() != 1) {
+      cout << key << "没找到" << endl;
       return false;
     }
   }
@@ -37,6 +41,7 @@ bool TreeValuesMatch(BPlusTree<KeyType, KeyValue, KeyComparator> &tree, std::vec
     index_key.SetFromInteger(key);
     tree.GetValue(index_key, &rids);
     if (!rids.empty()) {
+      cout << key << "不应该找到" << endl;
       return false;
     }
   }

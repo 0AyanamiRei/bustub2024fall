@@ -27,93 +27,59 @@ namespace bustub {
 enum class AccessType { Unknown = 0, Lookup, Scan, Index };
 
 class LRUKNode {
- private:
-  /** History of last seen K timestamps of this page. Least recent timestamp stored in front. */
-  // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
+ public:
+  LRUKNode();
+  explicit LRUKNode(frame_id_t fid, AccessType access_type = AccessType::Unknown);
 
-  [[maybe_unused]] std::list<size_t> history_;
-  [[maybe_unused]] size_t k_;
-  [[maybe_unused]] frame_id_t fid_;
-  [[maybe_unused]] bool is_evictable_{false};
+  frame_id_t fid_;
+  LRUKNode *next_, *prev_;
+  size_t accses_k_;
+  bool is_evictable_;
+  AccessType last_access_;
 };
 
-/**
- * LRUKReplacer implements the LRU-k replacement policy.
- *
- * The LRU-k algorithm evicts a frame whose backward k-distance is maximum
- * of all frames. Backward k-distance is computed as the difference in time between
- * current timestamp and the timestamp of kth previous access.
- *
- * A frame with less than k historical references is given
- * +inf as its backward k-distance. When multiple frames have +inf backward k-distance,
- * classical LRU algorithm is used to choose victim.
- */
 class LRUKReplacer {
  public:
-  /**
-   *
-   * TODO(P1): Add implementation
-   *
-   * @brief a new LRUKReplacer.
-   * @param num_frames the maximum number of frames the LRUReplacer will be required to store
-   */
   explicit LRUKReplacer(size_t num_frames, size_t k);
 
   DISALLOW_COPY_AND_MOVE(LRUKReplacer);
 
-  /**
-   * TODO(P1): Add implementation
-   *
-   * @brief Destroys the LRUReplacer.
-   */
-  ~LRUKReplacer() = default;
+  ~LRUKReplacer();
 
   /**
-   * TODO(P1): Add implementation
+   * @brief 找到具有largest backward k-distance的frame, 然后驱逐该frame, 对于
+   *        被访问次数小于k的frame, 在我的设计中就是在`kmid_`之后, 如果存在多个:
+   *        then evict frame with earliest timestamp based on LRU.
    *
-   * @brief Find the frame with largest backward k-distance and evict that frame. Only frames
-   * that are marked as 'evictable' are candidates for eviction.
-   *
-   * A frame with less than k historical references is given +inf as its backward k-distance.
-   * If multiple frames have inf backward k-distance, then evict frame with earliest timestamp
-   * based on LRU.
-   *
-   * Successful eviction of a frame should decrement the size of replacer and remove the frame's
-   * access history.
+   * @note Successful eviction of a frame should decrement the size of replacer and remove the frame's
+   * access history. 当前的策略是先在第一部分链表从`kmid_->head_`寻找可驱逐的frame, 如果不存在则在第二部分链表
+   * 从`kmid_->tail_`寻找可驱逐的frame, 如果整个链表都不存在则返回std::nullopt
    *
    * @param[out] frame_id id of frame that is evicted.
+   *
    * @return true if a frame is evicted successfully, false if no frames can be evicted.
+   *
+   * @warning 只有被标记为`evictable`的帧才允许被驱逐
    */
   auto Evict() -> std::optional<frame_id_t>;
 
   /**
-   * TODO(P1): Add implementation
+   * @brief 在当前timestamp, 给定frame_id的page被访问
    *
-   * @brief Record the event that the given frame id is accessed at current timestamp.
-   * Create a new entry for access history if frame id has not been seen before.
+   * @note - 如果该page没有被访问过, 那么为其创建一个新条目
+   * @note - 如果该page已被记录, 增加其`accses_k_`, 可能需要调整链表位置, 跨越`kmid_`
    *
-   * If frame id is invalid (ie. larger than replacer_size_), throw an exception. You can
-   * also use BUSTUB_ASSERT to abort the process if frame id is invalid.
-   *
-   * @param frame_id id of frame that received a new access.
-   * @param access_type type of access that was received. This parameter is only needed for
-   * leaderboard tests.
+   * @param[in] frame_id id of frame that received a new access.
+   * @param[in] access_type type of access that was received. This parameter is only needed for
+   *            leaderboard tests.
    */
   void RecordAccess(frame_id_t frame_id, AccessType access_type = AccessType::Unknown);
 
   /**
-   * TODO(P1): Add implementation
+   * @brief 切换一个frame的可驱逐状态, 同时维护`curr_size_`, 应该和可驱逐
+   *        frame的数量一致(区别frame和page)
    *
-   * @brief Toggle whether a frame is evictable or non-evictable. This function also
-   * controls replacer's size. Note that size is equal to number of evictable entries.
-   *
-   * If a frame was previously evictable and is to be set to non-evictable, then size should
-   * decrement. If a frame was previously non-evictable and is to be set to evictable,
-   * then size should increment.
-   *
-   * If frame id is invalid, throw an exception or abort the process.
-   *
-   * For other scenarios, this function should terminate without modifying anything.
+   * @warning 如果frame无效, 抛出一个异常或者终止进程
    *
    * @param frame_id id of frame whose 'evictable' status will be modified
    * @param set_evictable whether the given frame is evictable or not
@@ -123,17 +89,10 @@ class LRUKReplacer {
   /**
    * TODO(P1): Add implementation
    *
-   * @brief Remove an evictable frame from replacer, along with its access history.
-   * This function should also decrement replacer's size if removal is successful.
+   * @brief 移除一个指定`frame_id`的可驱逐的frame, 同时需要维护`curr_size_`
    *
-   * Note that this is different from evicting a frame, which always remove the frame
-   * with largest backward k-distance. This function removes specified frame id,
-   * no matter what its backward k-distance is.
-   *
-   * If Remove is called on a non-evictable frame, throw an exception or abort the
-   * process.
-   *
-   * If specified frame is not found, directly return from this function.
+   * @warning - 如果被调用在一个不可驱逐的frame上, 抛出一个异常或者终止进程
+   * @warning - 如果指定的frame没有找到, 立刻返回
    *
    * @param frame_id id of frame to be removed
    */
@@ -149,14 +108,30 @@ class LRUKReplacer {
   auto Size() -> size_t;
 
  private:
-  // TODO(student): implement me! You can replace these member variables as you like.
-  // Remove maybe_unused if you start using them.
-  [[maybe_unused]] std::unordered_map<frame_id_t, LRUKNode> node_store_;
-  [[maybe_unused]] size_t current_timestamp_{0};
-  [[maybe_unused]] size_t curr_size_{0};
-  [[maybe_unused]] size_t replacer_size_;
-  [[maybe_unused]] size_t k_;
-  [[maybe_unused]] std::mutex latch_;
+  /** @brief 在链表头添加 */
+  void Add2head(LRUKNode *temp);
+
+  /** @brief 在链表尾添加
+   * @warning 需要处理k=1的时候, lru-k此时等价于lru, 调用`add_beforeKmid()`
+   */
+  void Add2tail(LRUKNode *temp);
+
+  void AddAfterkmid(LRUKNode *temp);
+
+  void AddAftertail(LRUKNode *temp);
+
+  /** @brief 从链表中移除, 并返回 */
+  auto MyRemove(LRUKNode *temp) -> LRUKNode *;
+
+  void DebugShow();
+
+  std::unordered_map<frame_id_t, LRUKNode *> lruk_map_;
+  size_t curr_size_{0};
+  size_t replacer_size_;
+  size_t k_;
+  std::mutex latch_;
+
+  LRUKNode *head_, *kmid_, *tail_, *scan_;
 };
 
 }  // namespace bustub

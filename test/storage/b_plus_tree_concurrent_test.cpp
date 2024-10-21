@@ -25,6 +25,9 @@
 
 namespace bustub {
 
+using std::cout;
+using std::endl;
+
 using bustub::DiskManagerUnlimitedMemory;
 
 // helper function to launch multiple threads
@@ -139,7 +142,10 @@ void InsertTest1Call() {
     for (int64_t key = 1; key < scale_factor; key++) {
       keys.push_back(key);
     }
+
     LaunchParallelTest(2, InsertHelper, &tree, keys);
+
+    tree.Draw(bpm, "t.dot");
 
     std::vector<RID> rids;
     GenericKey<8> index_key;
@@ -427,7 +433,7 @@ void MixTest2Call() {
     }
 
     // Check all reserved keys exist
-    size = 0;
+    size = 0;    
 
     for (auto iter = tree.Begin(); iter != tree.End(); ++iter) {
       const auto &pair = *iter;
@@ -459,11 +465,11 @@ TEST(BPlusTreeConcurrentTest, DISABLED_DeleteTest2) {  // NOLINT
   DeleteTest2Call();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_MixTest1) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, MixTest1) {  // NOLINT
   MixTest1Call();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_MixTest2) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, MixTest2) {  // NOLINT
   MixTest2Call();
 }
 }  // namespace bustub

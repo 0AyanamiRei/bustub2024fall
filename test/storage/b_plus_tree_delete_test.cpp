@@ -24,7 +24,10 @@ namespace bustub {
 
 using bustub::DiskManagerUnlimitedMemory;
 
-TEST(BPlusTreeTests, DISABLED_DeleteTest) {
+using std::cout;
+using std::endl;
+
+TEST(BPlusTreeTests, DeleteTest) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -84,7 +87,7 @@ TEST(BPlusTreeTests, DISABLED_DeleteTest) {
   delete bpm;
 }
 
-TEST(BPlusTreeTests, DISABLED_SequentialEdgeMixTest) {  // NOLINT
+TEST(BPlusTreeTests, SequentialEdgeMixTest) {  // NOLINT
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -93,6 +96,7 @@ TEST(BPlusTreeTests, DISABLED_SequentialEdgeMixTest) {  // NOLINT
   auto *bpm = new BufferPoolManager(50, disk_manager.get());
 
   for (int leaf_max_size = 2; leaf_max_size <= 5; leaf_max_size++) {
+    cout << leaf_max_size << endl;
     // create and fetch header_page
     page_id_t page_id = bpm->NewPage();
 
@@ -132,6 +136,9 @@ TEST(BPlusTreeTests, DISABLED_SequentialEdgeMixTest) {  // NOLINT
     for (auto key : keys) {
       index_key.SetFromInteger(key);
       tree.Remove(index_key);
+      if(key == 2) {
+        tree.Draw(bpm, "t.dot");
+      }
       deleted.push_back(key);
       inserted.erase(std::find(inserted.begin(), inserted.end(), key));
       res = TreeValuesMatch<GenericKey<8>, RID, GenericComparator<8>>(tree, inserted, deleted);

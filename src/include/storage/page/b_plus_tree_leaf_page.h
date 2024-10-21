@@ -49,15 +49,9 @@ namespace bustub {
 INDEX_TEMPLATE_ARGUMENTS
 class BPlusTreeLeafPage : public BPlusTreePage {
  public:
-  // Delete all constructor / destructor to ensure memory safety
   BPlusTreeLeafPage() = delete;
   BPlusTreeLeafPage(const BPlusTreeLeafPage &other) = delete;
 
-  /**
-   * After creating a new leaf page from buffer pool, must call initialize
-   * method to set default values
-   * @param max_size Max size of the leaf node
-   */
   void Init(int max_size = LEAF_PAGE_SLOT_CNT);
 
   // Helper methods
@@ -65,12 +59,33 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
 
-  /**
-   * @brief For test only return a string representing all keys in
-   * this leaf page formatted as "(key1,key2,key3,...)"
-   *
-   * @return The string representation of all keys in the current internal page
-   */
+  // My helper func
+  auto IsFull() const -> bool;
+  auto RemoveKey(const KeyType &key, const KeyComparator &comparator) -> bool;
+  auto Insert2Leaf(const KeyType &key, const ValueType &rid, const KeyComparator &comparator) -> bool;
+  void SetKVByIndex(const MappingType &kv, const int index);
+  auto GetIdxByKey(const KeyType &key, const KeyComparator &comparator) const -> std::optional<int>;
+  auto GetValByKey(const KeyType &key, const KeyComparator &comparator) const -> std::optional<RID>;
+  auto GetKeyByIndex(const int index) const -> KeyType;
+  auto GetKVByIndex(int index) const -> const MappingType &;
+  auto GetArray() -> MappingType*;
+
+  void push_back(const MappingType &kv);
+  void push_front(const MappingType &kv);
+  auto pop_front() -> MappingType;
+  auto pop_back() -> MappingType;
+
+  auto SizeInvariantCheck(const int change) -> bool;
+  void MergeA2this(WritePageGuard &A);
+  auto SplitLeaf(WritePageGuard &right_guard, MappingType newkv, const KeyComparator &comparator)
+      -> std::optional<KeyType>;
+      
+  // keys[idx-1] < key <= keys[idx]
+  auto binarySearch(const KeyType &key, const KeyComparator &comparator) -> int;
+
+  auto getkey(const KeyType &key) -> int64_t;
+  void Debug();
+
   auto ToString() const -> std::string {
     std::string kstr = "(";
     bool first = true;
@@ -93,8 +108,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
  private:
   page_id_t next_page_id_;
   // Array members for page data.
-  KeyType key_array_[LEAF_PAGE_SLOT_CNT];
-  ValueType rid_array_[LEAF_PAGE_SLOT_CNT];
+  MappingType array_[LEAF_PAGE_SLOT_CNT];
   // (Fall 2024) Feel free to add more fields and helper functions below if needed
 };
 

@@ -12,21 +12,39 @@ namespace bustub {
  * set your own input parameters
  */
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::IndexIterator() = default;
+INDEXITERATOR_TYPE::IndexIterator(ReadPageGuard &&leaf_guard, int idx, BufferPoolManager *bpm)
+    : leaf_guard_(std::move(leaf_guard)), idx_(idx), bpm_(bpm) {}
 
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::~IndexIterator() = default;  // NOLINT
 
 INDEX_TEMPLATE_ARGUMENTS
-auto INDEXITERATOR_TYPE::IsEnd() -> bool { throw std::runtime_error("unimplemented"); }
-
-INDEX_TEMPLATE_ARGUMENTS
-auto INDEXITERATOR_TYPE::operator*() -> std::pair<const KeyType &, const ValueType &> {
-  throw std::runtime_error("unimplemented");
+auto INDEXITERATOR_TYPE::IsEnd() -> bool {
+  auto leaf_page = leaf_guard_.As<B_PLUS_TREE_LEAF_PAGE_TYPE>();
+  return leaf_page->GetNextPageId() == INVALID_PAGE_ID && idx_ >= leaf_page->GetSize() + 1;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & { throw std::runtime_error("unimplemented"); }
+auto INDEXITERATOR_TYPE::operator*() -> const MappingType & {
+  const B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page = leaf_guard_.As<B_PLUS_TREE_LEAF_PAGE_TYPE>();
+  BUSTUB_ASSERT(idx_ < leaf_page->GetSize(), "超出上限索引");
+  return leaf_page->GetKVByIndex(idx_);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
+  idx_++;
+  auto leaf_page = leaf_guard_.As<B_PLUS_TREE_LEAF_PAGE_TYPE>();
+  if (idx_ >= leaf_page->GetSize()) {
+    if (leaf_page->GetNextPageId() == INVALID_PAGE_ID) {
+      idx_ = leaf_page->GetSize() + 1;
+    } else {
+      leaf_guard_ = bpm_->ReadPage(leaf_page->GetNextPageId());
+      idx_ = 0;
+    }
+  }
+  return *this;
+}
 
 template class IndexIterator<GenericKey<4>, RID, GenericComparator<4>>;
 

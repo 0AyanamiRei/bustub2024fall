@@ -48,43 +48,41 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   BPlusTreeInternalPage() = delete;
   BPlusTreeInternalPage(const BPlusTreeInternalPage &other) = delete;
 
-  /**
-   * Writes the necessary header information to a newly created page, must be called after
-   * the creation of a new page to make a valid `BPlusTreeInternalPage`
-   * @param max_size Maximal size of the page
-   */
+
   void Init(int max_size = INTERNAL_PAGE_SLOT_CNT);
 
-  /**
-   * @param index The index of the key to get. Index must be non-zero.
-   * @return Key at index
-   */
+  // Helper methods
   auto KeyAt(int index) const -> KeyType;
-
-  /**
-   * @param index The index of the key to set. Index must be non-zero.
-   * @param key The new value for key
-   */
   void SetKeyAt(int index, const KeyType &key);
-
-  /**
-   * @param value The value to search for
-   * @return The index that corresponds to the specified value
-   */
   auto ValueIndex(const ValueType &value) const -> int;
-
-  /**
-   * @param index The index to search for
-   * @return The value at the index
-   */
   auto ValueAt(int index) const -> ValueType;
 
-  /**
-   * @brief For test only, return a string representing all keys in
-   * this internal page, formatted as "(key1,key2,key3,...)"
-   *
-   * @return The string representation of all keys in the current internal page
-   */
+  // My helper func
+  auto IsFull() const -> bool;
+  auto Insert2Inner(const KeyType &key, const ValueType &value, KeyComparator &comparator) -> bool;
+  auto GetValByKey(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
+  auto GetIndexByKey(const KeyType &key, const KeyComparator &comparator) const -> int;
+  auto GetValByIndex(const int idx) const -> ValueType;
+  auto GetKVbyIndex(int index) const -> MappingType;
+  auto GetArray() -> MappingType *;
+  void Insert2InnerByIdx(const MappingType newkv, int index);
+  void SetKVbyIndex(const MappingType &newkv, int index);
+  void SetValByIndex(const ValueType &val, int index);
+  void DeleteKVByIdx(int index);
+
+  void push_back(const MappingType &kv);
+  void push_front(const MappingType &kv);
+  auto pop_front() -> MappingType;
+  auto pop_back() -> MappingType;
+
+  auto SizeInvariantCheck(const int change) -> bool;
+  auto SplitInner(WritePageGuard &right_guard, const MappingType &newkey, const KeyComparator &comparator)
+      -> std::optional<KeyType>;
+  auto SearchSiblingByKey(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
+
+  void Debug();
+  auto getkey(const KeyType &key) -> int64_t;
+
   auto ToString() const -> std::string {
     std::string kstr = "(";
     bool first = true;
@@ -107,8 +105,9 @@ class BPlusTreeInternalPage : public BPlusTreePage {
 
  private:
   // Array members for page data.
-  KeyType key_array_[INTERNAL_PAGE_SLOT_CNT];
-  ValueType page_id_array_[INTERNAL_PAGE_SLOT_CNT];
+  // KeyType key_array_[INTERNAL_PAGE_SLOT_CNT];
+  // ValueType page_id_array_[INTERNAL_PAGE_SLOT_CNT];
+  MappingType array_[INTERNAL_PAGE_SLOT_CNT];
   // (Fall 2024) Feel free to add more fields and helper functions below if needed
 };
 

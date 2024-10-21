@@ -69,77 +69,43 @@ class BPlusTree {
                      const KeyComparator &comparator, int leaf_max_size = LEAF_PAGE_SLOT_CNT,
                      int internal_max_size = INTERNAL_PAGE_SLOT_CNT);
 
-  // Returns true if this B+ tree has no keys and values.
+  // 判断树是否为空, 即检查`header_page_id`指向page记录的`root_page_id_`是否有效
   auto IsEmpty() const -> bool;
-
-  // Insert a key-value pair into this B+ tree.
+  // 向B+树中插入(key, value)对
   auto Insert(const KeyType &key, const ValueType &value) -> bool;
-
-  // Remove a key and its value from this B+ tree.
+  // 删除指定key
   void Remove(const KeyType &key);
-
-  // Return the value associated with a given key
+  // 获取指定key对应的value
   auto GetValue(const KeyType &key, std::vector<ValueType> *result) -> bool;
-
-  // Return the page id of the root node
+  // 获取根节点
   auto GetRootPageId() -> page_id_t;
-
-  // Index iterator
   auto Begin() -> INDEXITERATOR_TYPE;
-
   auto End() -> INDEXITERATOR_TYPE;
-
   auto Begin(const KeyType &key) -> INDEXITERATOR_TYPE;
 
-  // Print the B+ tree
   void Print(BufferPoolManager *bpm);
-
-  // Draw the B+ tree
   void Draw(BufferPoolManager *bpm, const std::filesystem::path &outf);
-
-  /**
-   * @brief draw a B+ tree, below is a printed
-   * B+ tree(3 max leaf, 4 max internal) after inserting key:
-   *  {1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 18, 19, 20}
-   *
-   *                               (25)
-   *                 (9,17,19)                          (33)
-   *  (1,5)    (9,13)    (17,18)    (19,20,21)    (25,29)    (33,37)
-   *
-   * @return std::string
-   */
   auto DrawBPlusTree() -> std::string;
-
-  // read data from file and insert one by one
   void InsertFromFile(const std::filesystem::path &file_name);
-
-  // read data from file and remove one by one
   void RemoveFromFile(const std::filesystem::path &file_name);
-
-  /**
-   * @brief Read batch operations from input file, below is a sample file format
-   * insert some keys and delete 8, 9 from the tree with one step.
-   * { i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i30 d8 d9 } //  batch.txt
-   * B+ Tree(4 max leaf, 4 max internal) after processing:
-   *                            (5)
-   *                 (3)                (7)
-   *            (1,2)    (3,4)    (5,6)    (7,10,30) //  The output tree example
-   */
   void BatchOpsFromFile(const std::filesystem::path &file_name);
 
  private:
-  /* Debug Routines for FREE!! */
   void ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out);
-
   void PrintTree(page_id_t page_id, const BPlusTreePage *page);
-
-  /**
-   * @brief Convert A B+ tree into a Printable B+ tree
-   *
-   * @param root_id
-   * @return PrintableNode
-   */
   auto ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree;
+
+  // 辅助函数
+  auto getkey(const KeyType &key) -> int64_t;
+  void GetLeafWritePageGuard(const KeyType &key, Context &ctx, BtreeAccessType access_type);
+  auto GetLeafReadPageGuard(const KeyType &key) -> ReadPageGuard;
+  // 递归插入newkv
+  void RecInsert2Inner(Context &ctx, WritePageGuard &&left_guard, WritePageGuard &&right_guard, KeyType &key);
+  // 处理节点数量过少的叶子节点
+  void FixUnderflowLeaf(Context &ctx, LeafPage *leaf_page, WritePageGuard &&leafpage_guard, const KeyType &key);
+  // 递归删除内部节点
+  void RemoveInternalPage(Context &ctx, InternalPage *update_page, WritePageGuard &&update_pageguard, int idx);
+
 
   // member variable
   std::string index_name_;
