@@ -57,6 +57,28 @@ void BPLUSTREE_TYPE::RemoveFromFile(const std::filesystem::path &file_name) {
   }
 }
 
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::filesystem::path &outf) {
+  if (IsEmpty()) {
+    LOG_WARN("Drawing an empty tree");
+    return;
+  }
+
+  std::ofstream out(outf);
+  if (!out.is_open()) {
+    LOG_ERROR("Failed to open the file");
+    return;
+  }
+
+  out << "digraph G {" << std::endl;
+  auto root_page_id = GetRootPageId();
+  auto guard = bpm->ReadPage(root_page_id);
+  ToGraph(guard.GetPageId(), guard.template As<BPlusTreePage>(), out);
+  out << "}" << std::endl;
+  out.close();
+}
+
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::filesystem::path &outf) {
   if (IsEmpty()) {
@@ -125,6 +147,7 @@ void BPLUSTREE_TYPE::PrintTree(page_id_t page_id, const BPlusTreePage *page) {
   }
 }
 
+
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::DrawBPlusTree() -> std::string {
   if (IsEmpty()) {
@@ -137,6 +160,9 @@ auto BPLUSTREE_TYPE::DrawBPlusTree() -> std::string {
 
   return out_buf.str();
 }
+
+
+
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out) {
@@ -250,6 +276,7 @@ void BPLUSTREE_TYPE::BatchOpsFromFile(const std::filesystem::path &file_name) {
   }
   input.close();
 }
+
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree {
