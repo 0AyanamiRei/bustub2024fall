@@ -60,7 +60,6 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   // My helper func
   auto IsFull() const -> bool;
   auto Insert2Inner(const KeyType &key, const ValueType &value, KeyComparator &comparator) -> bool;
-  auto binarySearch(const KeyType &key, const KeyComparator &comparator) const -> int;
   auto GetValByKey(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
   auto GetIndexByKey(const KeyType &key, const KeyComparator &comparator) const -> int;
   auto GetValByIndex(const int idx) const -> ValueType;

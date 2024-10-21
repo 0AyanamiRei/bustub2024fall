@@ -230,33 +230,40 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::SplitLeaf(WritePageGuard &right_guard, MappingT
 
 /** 将A的array按次序添加到自己的队尾 */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::MergeA2this(WritePageGuard &&A) {
+void B_PLUS_TREE_LEAF_PAGE_TYPE::MergeA2this(WritePageGuard &A) {
   B_PLUS_TREE_LEAF_PAGE_TYPE *A_page = A.AsMut<B_PLUS_TREE_LEAF_PAGE_TYPE>();
-  int A_size = A_page->GetSize();
+  auto A_size = A_page->GetSize();
   MappingType *A_array = A_page->GetArray();
-  next_page_id_ = A_page->GetNextPageId();
+  SetNextPageId(A_page->GetNextPageId());
   /** 将A的array加入到自己队尾 */
   for (int i = 0; i < A_size; i++) {
-    array_[size_++] = A_array[i];
+    this->push_back(A_array[i]);
   }
 }
 
-/** 删除指定key @TODO 二分优化 */
+/** 删除指定key */
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveKey(const KeyType &key, const KeyComparator &comparator) -> bool {
-  int pos;
-  for(pos = 0; pos < size_; pos ++) {
-    if(!comparator(array_[pos].first, key)){
+  int n = GetSize();
+  int l = 0, r = n, mid;
+  while (l < r) {
+    mid = l + (r - l) / 2;
+    auto res = comparator(array_[mid].first, key);
+    if (res == 1) {  // >
+      r = mid;
+    } else if (res == -1) {  // <
+      l = mid + 1;
+    } else {  // =
       break;
     }
   }
-  if(pos >= size_) {
+  if (comparator(array_[mid].first, key)) {  // 不存在
     return false;
   }
-  for (int i = pos; i + 1 < size_; i++) {  // 删除指定key
+  for (int i = mid; i < n - 1; i++) {  // 删除指定key
     array_[i] = array_[i + 1];
   }
-  size_--;
+  this->IncreaseSize(-1);
   return true;
 }
 
@@ -270,16 +277,16 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::SizeInvariantCheck(const int change) -> bool {
 /** 在keys中寻找大于等于key的最小下标*/
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::binarySearch(const KeyType &key, const KeyComparator &comparator) -> int {
-  // 寻找区间[keys[l], keys[l+1])
-  int l = 0, r = GetSize() - 1, mid;
-  while (l <= r) {
+  int l = 0, r = GetSize(), mid;
+  while (l < r) {
     mid = l + (r - l) / 2;
-    auto res = comparator(key, array_[mid].first);
-    if (res > 0) {
+    auto res = comparator(array_[mid].first, key);
+    if (res < 0) {
       l = mid + 1;
-    } else {
-      r = mid - 1;
-    }
+    }  // >
+    else {
+      r = mid;
+    }  // <=
   }
   return l;
 }

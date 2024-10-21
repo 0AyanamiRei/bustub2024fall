@@ -31,57 +31,27 @@ bool insert(vector<int> &vec, int key) {
   return true;
 }
 
-int comparator(int a, int b) {
-  if(a > b) return 1;
-  if(a < b) return -1;
-  return 0;
-}
-
-int get_idx(int keys[], int target, int sz) {
-  if(keys[1] > target) { // 属于区间(负无穷, keys[1])
-    return 0;
-  }
-
-  int l = 1, r = sz, mid;
-  while(l < r ) {
-    mid = (l+r+1)/2;
-    if (target >= keys[mid]) {
-      l = mid;
-    }  // >=
-    else {
-      r = mid - 1;
-    }  // <
-  }
-  return l;
-}
-
-// keys= {无效值, k1, k2, k3, ..., k_sz}
-// 从0~sz开始的区间
-// (负无穷, k1), [k1, k2), [k2, k3) ..., [k_sz, 正无穷)
-int inner_get_idx(int keys[], int target, int sz) {
-  // 第一个区间(负无穷, keys[1])
-  if (comparator(target, keys[1]) == -1) {
-    return 0;
-  }
-  // 寻找区间[keys[l], keys[l+1])
-  int l = 1, r = sz, mid;
-  while (l <= r) {
-    mid = l + (r - l) / 2;
-    auto res = comparator(target, keys[mid]);
-    if (res >= 0) {
-      l = mid + 1;
-    } else {
-      r = mid - 1;
-    }
-  }
-  return l - 1;
-}
-
 int main() {
-  int key = 9;
-  int keys[] = {100000, 5, 9};
-  cout << inner_get_idx(keys, key, 2) << endl;
+  int max_size = 10;
+  int array_[10] = {1, 2, 4, 5, 6, 7, 11, 18, 19, 20};
+  int right_array[10];
+  int sz = 0;
+  int left_nums = 11/2;
+  int pos = 2;
+  int newkv = 3;
 
+  for (int i = left_nums - 1; i < max_size; i++) {
+    right_array[sz++] = array_[i];
+  }
+  // 左节点等价于新插入kv
+  for (int i = left_nums; i > pos; --i) {
+    array_[i] = array_[i - 1];
+  }
+  array_[pos] = newkv;
+
+  for(int i = 0; i < sz; i ++) cout << right_array[i] << " ";
+  cout << endl;
+  for(int i = 0; i < left_nums; i++) cout << array_[i] <<" ";
 
   return 0;
 }

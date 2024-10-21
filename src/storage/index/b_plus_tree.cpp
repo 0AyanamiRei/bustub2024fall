@@ -13,6 +13,16 @@ auto BPLUSTREE_TYPE::getkey(const KeyType &key) -> int64_t {
   return kval;
 }
 
+using std::cout;
+using std::endl;
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::getkey(const KeyType &key) -> int64_t {
+  int64_t kval;
+  memcpy(&kval, key.data_, sizeof(int64_t));
+  return kval;
+}
+
 INDEX_TEMPLATE_ARGUMENTS
 BPLUSTREE_TYPE::BPlusTree(std::string name, page_id_t header_page_id, BufferPoolManager *buffer_pool_manager,
                           const KeyComparator &comparator, int leaf_max_size, int internal_max_size)
@@ -101,10 +111,12 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
   }
   LeafPage *right_page = right_guard.AsMut<LeafPage>();
   (void)right_page; // for debug
+  
   // update_guard -> left_guard + right_guard
   RecInsert2Inner(std::ref(ctx), std::move(update_guard), std::move(right_guard), newkey_opt.value());
   return true;
 }
+
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Remove(const KeyType &key) {
@@ -141,7 +153,7 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
 
   while (!cursor_page->IsLeafPage()) {
     const InternalPage *cursor_as_inner = cursor_guard.As<InternalPage>();
-    cursor_pid = cursor_as_inner->GetValByIndex(0);
+    cursor_pid = cursor_as_inner->GetKVbyIndex(0).second;
     cursor_guard = bpm_->ReadPage(cursor_pid);
     cursor_page = cursor_guard.As<BPlusTreePage>();
   }
@@ -154,6 +166,7 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
   ReadPageGuard leaf_guard = GetLeafReadPageGuard(key);
   const LeafPage *leaf_page = leaf_guard.As<LeafPage>();
   std::optional<int> idx = leaf_page->GetIdxByKey(key, comparator_);
+  LOG_INFO("初始化迭代器: page%d, idx%d", leaf_guard.GetPageId(), idx.value());
   return INDEXITERATOR_TYPE(std::move(leaf_guard), idx.value(), bpm_);
 }
 
@@ -198,12 +211,12 @@ void BPLUSTREE_TYPE::GetLeafWritePageGuard(const KeyType &key, Context &ctx, Btr
     cursor_guard = bpm_->WritePage(cursor_pid);                       // 拿到下一层节点PageGuard
     cursor_page = cursor_guard.AsMut<BPlusTreePage>();
     /**< Latch crabbing-Safe */
-    if (cursor_page->IsSafe(access_type)) {
-      ctx.header_page_ = std::nullopt;
-      while (!ctx.write_set_.empty()) {
-        ctx.write_set_.pop_front();
-      }
-    }
+    // if (cursor_page->IsSafe(access_type)) {
+    //   ctx.header_page_ = std::nullopt;
+    //   while (!ctx.write_set_.empty()) {
+    //     ctx.write_set_.pop_front();
+    //   }
+    // }
     ctx.write_set_.emplace_back(std::move(cursor_guard));  // 移动
     if (cursor_page->IsLeafPage()) {
       return;
@@ -228,6 +241,7 @@ auto BPLUSTREE_TYPE::GetLeafReadPageGuard(const KeyType &key) -> ReadPageGuard {
 
   return cursor_guard;
 }
+
 
 
 // 下一层节点(不需要区分leaf和inner)发生分裂, 修改其父节点`cursor`
@@ -268,16 +282,17 @@ void BPLUSTREE_TYPE::RecInsert2Inner(Context &ctx, WritePageGuard &&left_guard, 
 }
 
 
+
 // 恢复underflow condition下的叶子节点
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::FixUnderflowLeaf(Context &ctx, LeafPage *leaf_page, WritePageGuard &&leafpage_guard,
                                       const KeyType &key) {
   // leaf_page就是root_page
   if (ctx.write_set_.empty()) {
+    //LOG_INFO("正在从root_page删除%ld", getkey(key));
     if (leaf_page->GetSize() == 0) { /** 删除root_page */
-      auto head_page = ctx.header_page_.value().AsMut<BPlusTreeHeaderPage>();
-      head_page->root_page_id_ = INVALID_PAGE_ID;
-      LOG_INFO("修改为空树");
+      auto tree_page = ctx.header_page_.value().AsMut<BPlusTreeHeaderPage>();
+      tree_page->root_page_id_ = INVALID_PAGE_ID;
     }
     return;
   }
@@ -291,17 +306,14 @@ void BPLUSTREE_TYPE::FixUnderflowLeaf(Context &ctx, LeafPage *leaf_page, WritePa
   ctx.write_set_.pop_back();
   /** */
   int idx2update = parent_page->GetIndexByKey(key, comparator_);
-  // 只有当idx2update > 0 才存在左兄弟
-  left_page_id = (idx2update > 0) ? parent_page->GetValByIndex(idx2update - 1) : INVALID_PAGE_ID ;
-  // 只有当idx2update < parent_page->GetSize() 才有右兄弟
-  right_page_id = (idx2update < parent_page->GetSize()) ? parent_page->GetValByIndex(idx2update + 1) : INVALID_PAGE_ID;
-  if(left_page_id == leafpage_guard.GetPageId()) {
-    LOG_INFO("父节点中查询%ld, 返回idx=%d, 父节点size=%d", getkey(key), idx2update, parent_page->GetSize());
-    LOG_INFO("left_page_id=%d, leafpage_page_id=%d",left_page_id, leafpage_guard.GetPageId());
-    parent_page->Debug();
+  left_page_id = (idx2update == 0) ? INVALID_PAGE_ID : parent_page->GetValByIndex(idx2update - 1);
+  right_page_id = parent_page->GetValByIndex(idx2update + 1);
+
+  if(right_page_id != INVALID_PAGE_ID || left_page_id != INVALID_PAGE_ID) {
+    BUSTUB_ASSERT(left_page_id != right_page_id, "左右节点page_id错误");
+    BUSTUB_ASSERT(left_page_id != leafpage_guard.GetPageId(), "左节点page_id错误");
+    BUSTUB_ASSERT(right_page_id != leafpage_guard.GetPageId(), "右节点page_id错误");
   }
-  BUSTUB_ASSERT(left_page_id != leafpage_guard.GetPageId(), "左节点page_id错误");
-  BUSTUB_ASSERT(right_page_id != leafpage_guard.GetPageId(), "右节点page_id错误");
   /** */
   if (left_page_id != INVALID_PAGE_ID) {  // 尝试获取左节点
     left_guard = bpm_->WritePage(left_page_id);
@@ -313,23 +325,23 @@ void BPLUSTREE_TYPE::FixUnderflowLeaf(Context &ctx, LeafPage *leaf_page, WritePa
   }
   
   /** */
-  if (left_page_id != INVALID_PAGE_ID && left_page->SizeInvariantCheck(-1)) {  // push_front左节点末尾kv, 并更新父节点key
+  if (left_page_id != INVALID_PAGE_ID && left_page->SizeInvariantCheck(-1)) {  // 尝试移动左节点末尾的kv到自己的头部
     leaf_page->push_front(left_page->pop_back());
-    parent_page->SetKeyAt(idx2update, leaf_page->GetKeyByIndex(0));
-  } else if (right_page_id != INVALID_PAGE_ID && right_page->SizeInvariantCheck(-1)) {  // push_back右节点头部kv, 并更新父节点kv
+    parent_page->SetKeyAt(idx2update, leaf_page->GetKeyByIndex(0));  // 更新父节点的key
+  } else if (right_page_id != INVALID_PAGE_ID && right_page->SizeInvariantCheck(-1)) {  // 尝试移动右节点头部的kv到自己的末尾
     leaf_page->push_back(right_page->pop_front());
-    parent_page->SetKeyAt(idx2update + 1, right_page->GetKeyByIndex(0));
-  } else if (left_page_id != INVALID_PAGE_ID) {  // 将自身合并到左节点
+    parent_page->SetKeyAt(idx2update + 1, right_page->GetKeyByIndex(0));  // 更新父节点的key
+  } else if (left_page_id != INVALID_PAGE_ID) {                           // 将自身合并到左节点
     KeyType rval = leaf_page->GetKeyByIndex(0);
     int i_idx = parent_page->GetIndexByKey(rval, comparator_);  // 即找到在父节点中要删除kv的下标
-    BUSTUB_ASSERT(parent_page->GetValByIndex(i_idx) == leafpage_guard.GetPageId(), "父节点中的指针不对");
-    left_page->MergeA2this(std::move(leafpage_guard));
+    left_page->MergeA2this(leafpage_guard);                     // 合并到左节点
+    //LOG_INFO("合并到左节点");
     RemoveInternalPage(std::ref(ctx), parent_page, std::move(parent_guard), i_idx);
   } else if (right_page_id != INVALID_PAGE_ID) {  // 吞并右节点
     KeyType rval = right_page->GetKeyByIndex(0);
-    int i_idx = parent_page->GetIndexByKey(rval, comparator_);  // 即找到在父节点中要删除kv的下标
-    BUSTUB_ASSERT(parent_page->GetValByIndex(i_idx) == right_guard.GetPageId(), "父节点中的指针不对");
-    leaf_page->MergeA2this(std::move(right_guard));                        // 吞并右节点
+    int i_idx = parent_page->GetIndexByKey(rval, comparator_);  // 即找到在父节点中要删除kv的下标(1)
+    leaf_page->MergeA2this(right_guard);                        // 吞并右节点
+    //LOG_INFO("吞并右节点");
     RemoveInternalPage(std::ref(ctx), parent_page, std::move(parent_guard), i_idx);
   } else {  // 仅剩自己了
     // 我在RemoveInternalPage()处理了删到只剩下1个root和1个leaf的情况
@@ -342,10 +354,12 @@ void BPLUSTREE_TYPE::FixUnderflowLeaf(Context &ctx, LeafPage *leaf_page, WritePa
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::RemoveInternalPage(Context &ctx, InternalPage *update_page, WritePageGuard &&update_pageguard,
                                         int idx) {
+  // 先删掉array_[idx]再说
   std::pair<KeyType, page_id_t> kv = update_page->GetKVbyIndex(idx);
   update_page->DeleteKVByIdx(idx);
   // case1(递归终点) 根节点
   if (ctx.write_set_.empty()) {
+    //LOG_INFO("递归到根%ld", getkey(kv.first));
     if (update_page->GetSize() == 0U) {  // 只剩下1个leaf和1个root, 释放root, 修改leaf为新的root
       BPlusTreeHeaderPage *tree_page = ctx.header_page_.value().AsMut<BPlusTreeHeaderPage>();
       tree_page->root_page_id_ = update_page->GetValByIndex(0);
@@ -366,10 +380,13 @@ void BPLUSTREE_TYPE::RemoveInternalPage(Context &ctx, InternalPage *update_page,
   ctx.write_set_.pop_back();
   // B+树对内部节点来说, 如果当前这层还有父节点, 那么这层的节点数b>=2
   int idx2update = parent_page->GetIndexByKey(kv.first, comparator_);
-  left_page_id = (idx2update > 0) ? parent_page->GetValByIndex(idx2update - 1) : INVALID_PAGE_ID;
-  right_page_id = (idx2update < parent_page->GetSize()) ? parent_page->GetValByIndex(idx2update + 1) : INVALID_PAGE_ID;
-  BUSTUB_ASSERT(left_page_id != update_pageguard.GetPageId(), "左节点page_id错误");
-  BUSTUB_ASSERT(right_page_id != update_pageguard.GetPageId(), "右节点page_id错误");
+  left_page_id = idx2update == 0 ? INVALID_PAGE_ID : parent_page->GetValByIndex(idx2update - 1);
+  right_page_id = idx2update == parent_page->GetSize() ? INVALID_PAGE_ID : parent_page->GetValByIndex(idx2update + 1);
+  if(right_page_id != INVALID_PAGE_ID || left_page_id != INVALID_PAGE_ID) {
+    BUSTUB_ASSERT(left_page_id != right_page_id, "左右节点page_id错误");
+    BUSTUB_ASSERT(left_page_id != update_pageguard.GetPageId(), "左节点page_id错误");
+    BUSTUB_ASSERT(right_page_id != update_pageguard.GetPageId(), "右节点page_id错误");
+  }
   /** */
   if (left_page_id != INVALID_PAGE_ID) {  // 尝试获取左节点
     left_guard = bpm_->WritePage(left_page_id);
@@ -381,12 +398,12 @@ void BPLUSTREE_TYPE::RemoveInternalPage(Context &ctx, InternalPage *update_page,
   }
   /** */
   if (left_page_id != INVALID_PAGE_ID && left_page->SizeInvariantCheck(-1)) {  // 从左兄弟获取kv
-    auto left_kv = left_page->pop_back();  // 弹出左兄弟队尾kv
-    update_page->SetKeyAt(0, parent_page->GetKVbyIndex(idx2update).first); // 将父节点key拷贝到自己
-    update_page->push_front(left_kv);  // 压入左兄弟队尾kv
-    parent_page->SetKeyAt(idx2update, left_kv.first); // 设置父节点key为左兄弟队尾kv.first
+    auto left_kv = left_page->pop_back();  // 左兄弟队尾kv
+    update_page->SetKeyAt(0, parent_page->GetKVbyIndex(idx2update).first);
+    update_page->push_front({left_kv.first, left_kv.second});  // 这里left_kv.first是随便填的
+    parent_page->SetKeyAt(idx2update, left_kv.first);
   } else if (right_page_id != INVALID_PAGE_ID && right_page->SizeInvariantCheck(-1)) {  // 从右兄弟获取kv
-    auto right_kv = right_page->pop_front();  // 弹出右兄弟队头kv
+    auto right_kv = right_page->pop_front();  // 右兄弟队头kv 只取v
     update_page->Insert2InnerByIdx({parent_page->GetKVbyIndex(idx2update + 1).first, right_kv.second}, update_page->GetSize() + 1);
     parent_page->SetKeyAt(idx2update + 1, right_page->GetKVbyIndex(0).first);
   } else if (left_page_id != INVALID_PAGE_ID) {  // 合并到左兄弟
