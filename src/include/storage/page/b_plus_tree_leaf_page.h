@@ -76,11 +76,11 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto pop_back() -> MappingType;
 
   auto SizeInvariantCheck(const int change) -> bool;
-  void MergeA2this(WritePageGuard &A);
+  void MergeA2this(WritePageGuard &&A);
   auto SplitLeaf(WritePageGuard &right_guard, MappingType newkv, const KeyComparator &comparator)
       -> std::optional<KeyType>;
       
-  // keys[idx-1] < key <= keys[idx]
+  // keys[idx] <= key < keys[idx+1]
   auto binarySearch(const KeyType &key, const KeyComparator &comparator) -> int;
 
   auto getkey(const KeyType &key) -> int64_t;

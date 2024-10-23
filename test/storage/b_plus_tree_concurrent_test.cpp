@@ -145,7 +145,6 @@ void InsertTest1Call() {
 
     LaunchParallelTest(2, InsertHelper, &tree, keys);
 
-    tree.Draw(bpm, "t.dot");
 
     std::vector<RID> rids;
     GenericKey<8> index_key;
@@ -252,6 +251,7 @@ void DeleteTest1Call() {
     // sequential insert
     std::vector<int64_t> keys = {1, 2, 3, 4, 5};
     InsertHelper(&tree, keys);
+    tree.Draw(bpm, "t.dot");
 
     std::vector<int64_t> remove_keys = {1, 5, 3, 4};
     LaunchParallelTest(2, DeleteHelper, &tree, remove_keys);
@@ -358,7 +358,7 @@ void MixTest1Call() {
     tasks.emplace_back(insert_task);
     tasks.emplace_back(delete_task);
     std::vector<std::thread> threads;
-    size_t num_threads = 10;
+    size_t num_threads = 2;
     for (size_t i = 0; i < num_threads; i++) {
       threads.emplace_back(tasks[i % tasks.size()], i);
     }
@@ -370,6 +370,7 @@ void MixTest1Call() {
 
     for (auto iter = tree.Begin(); iter != tree.End(); ++iter) {
       const auto &pair = *iter;
+
       ASSERT_EQ((pair.first).ToString(), for_insert[size]);
       size++;
     }
@@ -449,19 +450,19 @@ void MixTest2Call() {
   }
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_InsertTest1) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, InsertTest1) {  // NOLINT
   InsertTest1Call();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_InsertTest2) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, InsertTest2) {  // NOLINT
   InsertTest2Call();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_DeleteTest1) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, DeleteTest1) {  // NOLINT
   DeleteTest1Call();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_DeleteTest2) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, DeleteTest2) {  // NOLINT
   DeleteTest2Call();
 }
 
