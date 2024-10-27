@@ -230,7 +230,6 @@ auto BPLUSTREE_TYPE::GetLeafReadPageGuard(const KeyType &key) -> ReadPageGuard {
 }
 
 
-
 // 下一层节点(不需要区分leaf和inner)发生分裂, 修改其父节点`cursor`
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::RecInsert2Inner(Context &ctx, WritePageGuard &&left_guard, WritePageGuard &&right_guard,

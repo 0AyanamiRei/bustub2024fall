@@ -10,3 +10,20 @@
 4. ....
 
 这里涉及了挺多关系代数运算的化解和转化
+
+# LEC
+
+logical plan和physical plan, 后者带有更多更详细的静态信息
+
+基于rules的优化和基于成本估计的优化, 比如这样一些规则, 可以用来重写逻辑计划
+
+1. Projection Pushdown
+2. Predicate Pushdown
+3. Replace Cartesian Product
+4. ...
+
+教授也说了, 数据库优化器是一个很难的模块, 需要阅读大量的文章, 同时也需要时间的沉淀(拥有大量负载的优化策略), 搜索了一下, 发现现在AI4DB也大量集中在优化器上的, 对不同查询用不同的方式, 比如RL可以去做NP-Hard的Join选择等等, 感觉是一个很challenge的方向, 先留个心眼, 这里是搜到的一些资料:
+
+1. https://zhuanlan.zhihu.com/p/40478975
+2. https://zhuanlan.zhihu.com/p/413105655
+3. ...
