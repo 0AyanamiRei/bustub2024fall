@@ -26,7 +26,7 @@ auto INDEXITERATOR_TYPE::IsEnd() -> bool {
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::operator*() -> const MappingType & {
-  const B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page = leaf_guard_.As<B_PLUS_TREE_LEAF_PAGE_TYPE>();
+  const auto *leaf_page = leaf_guard_.As<B_PLUS_TREE_LEAF_PAGE_TYPE>();
   BUSTUB_ASSERT(idx_ < leaf_page->GetSize(), "超出上限索引");
   return leaf_page->GetKVByIndex(idx_);
 }

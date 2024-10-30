@@ -72,19 +72,19 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert2Inner(const KeyType &key, const ValueType &value, KeyComparator &comparator)
     -> bool {
   int n = GetSize();
-  int l = 1, r = n + 1, mid;
+  int l = 1;
+  int r = n + 1;
+  int mid = 0;
   while (l < r) {
     mid = l + (r - l) / 2;
     auto res = comparator(array_[mid].first, key);
     if (res == 1) {
       r = mid;
-    }  // >
-    else if (res == -1) {
+    } else if (res == -1) {
       l = mid + 1;
-    }  // <
-    else {
+    } else {
       return false;
-    }  // =
+    }
   }
 
   for (int i = GetSize() + 1; i > l; --i) {
@@ -96,23 +96,48 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert2Inner(const KeyType &key, const Valu
   return true;
 }
 
+// 根据key找到在内部节点中的指针下标
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetValByKey(const KeyType &key, const KeyComparator &comparator) const -> ValueType {
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::BinarySearch(const KeyType &key, const KeyComparator &comparator) const -> int {
+  // 第一个区间(负无穷, keys[1])
+  if (comparator(key, array_[1].first) == -1) {
+    return 0;
+  }
+  // 寻找区间[keys[l], keys[l+1])
+  int l = 1;
+  int r = GetSize();
+  int mid = 0;
+  while (l <= r) {
+    mid = l + (r - l) / 2;
+    auto res = comparator(key, array_[mid].first);
+    if (res >= 0) {
+      l = mid + 1;
+    } else {
+      r = mid - 1;
+    }  // <
+  }
+  return l - 1;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetValByKey(const KeyType &key, const KeyComparator &comparator) const
+    -> ValueType {
   // 最左边的区间
   if (comparator(key, array_[1].first) == -1) {
     return array_[0].second;
   }
   // 二分寻找
-  int l = 1, r = GetSize() + 1, mid;
+  int l = 1;
+  int r = GetSize() + 1;
+  int mid = 0;
   while (l < r) {
     mid = l + (r - l) / 2;
     auto res = comparator(array_[mid].first, key);
     if (res == 1) {
       r = mid;
-    }  // >
-    else {
+    } else {
       l = mid + 1;
-    }  // <=
+    }
   }
   // K[l-1] <= key < K[l]
   return array_[l - 1].second;
@@ -121,29 +146,12 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetValByKey(const KeyType &key, const KeyCo
 // 返回的l满足: key[l]  <= key < key[l+1], 既key属于P[l]指向的leaf node
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetIndexByKey(const KeyType &key, const KeyComparator &comparator) const -> int {
-  // key < array[1].key
-  if (comparator(key, array_[1].first) == -1) {
-    return 0;
-  }
-
-  int l = 1, r = GetSize(), mid;
-
-  while (l < r) {
-    mid = (l + r + 1) / 2;
-    auto res = comparator(key, array_[mid].first);
-    if (res == -1) {  // <
-      r = mid - 1;
-    } else {  // >=
-      l = mid;
-    }
-  }
-  // k[l] <= key < k[l+1]
-  return l;
+  return BinarySearch(key, comparator);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetValByIndex(const int idx) const -> ValueType {
-  if(idx > GetSize()) {
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetValByIndex(int idx) const -> ValueType {
+  if (idx > GetSize()) {
     return INVALID_PAGE_ID;
   }
   return array_[idx].second;
@@ -189,11 +197,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::pop_front() -> MappingType {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::pop_back() -> MappingType {
-  MappingType ret = array_[GetSize()];
-  IncreaseSize(-1);
-  return ret;
-}
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::pop_back() -> MappingType { return array_[size_--]; }
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert2InnerByIdx(const MappingType newkv, int index) {
@@ -216,7 +220,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Debug() {
   std::cout << " key:  ";
   for (int i = 1; i <= GetSize(); i++) {
-    std::cout << getkey(array_[i].first) << " ";
+    std::cout << Getkey(array_[i].first) << " ";
   }
   std::cout << std::endl;
   std::cout << " val: ";
@@ -227,7 +231,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Debug() {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::getkey(const KeyType &key) -> int64_t {
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Getkey(const KeyType &key) -> int64_t {
   int64_t kval;
   memcpy(&kval, key.data_, sizeof(int64_t));
   return kval;
@@ -244,39 +248,38 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::DeleteKVByIdx(int index) {
 
 /** 内部节点的Size是按照指针的数量来算的 */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SizeInvariantCheck(const int change) -> bool {
-  return GetSize() + change + 1 >= GetMinSize();
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SizeInvariantCheck(int change) -> bool {
+  return GetSize() + change + 1 >= GetMinSize();  // 指针的数量
 }
 
 /** 内部节点的分裂, this.array_ 就是left_guard保护的page内容 */
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SplitInner(WritePageGuard &right_guard, const MappingType &newkv,
                                                 const KeyComparator &comparator) -> std::optional<KeyType> {
-  B_PLUS_TREE_INTERNAL_PAGE_TYPE *right_page = right_guard.AsMut<B_PLUS_TREE_INTERNAL_PAGE_TYPE>();
+  auto *right_page = right_guard.AsMut<B_PLUS_TREE_INTERNAL_PAGE_TYPE>();
   int max_size = GetMaxSize();
   int left_nums = (max_size + 1) / 2;
   this->SetSize(left_nums - 1);
   right_page->Init(max_size);
 
   // l=[1~max_size]
-  int l = 1, r = max_size, mid;
+  int l = 1;
+  int r = max_size;
+  int mid = 0;
   while (l < r) {
     mid = l + (r - l) / 2;
     auto res = comparator(array_[mid].first, newkv.first);
     if (res == 1) {
       r = mid;
-    }  // >
-    else if (res == -1) {
+    } else if (res == -1) {
       l = mid + 1;
-    }  // <
-    else {
+    } else {
       return std::nullopt;
     }  // = 错误处理
   }
 
-
   MappingType *right_array = right_page->GetArray();
-  (void) right_array;
+  (void)right_array;
   int sz = 0;
 
   if (left_nums <= l) {
@@ -299,12 +302,12 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SplitInner(WritePageGuard &right_guard, con
     }
     // 左节点等价于新插入kv
     for (int i = left_nums; i > l; i--) {
-      array_[i] = array_[i-1];
+      array_[i] = array_[i - 1];
     }
     array_[l] = newkv;
   }
 
-  right_page->SetSize(sz-1);
+  right_page->SetSize(sz - 1);
 
   // 往上传的是正中间的key
   return right_page->KeyAt(0);
@@ -314,19 +317,19 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SplitInner(WritePageGuard &right_guard, con
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SearchSiblingByKey(const KeyType &key, const KeyComparator &comparator) const
     -> ValueType {
-  int l = 1, r = GetSize() + 1, mid;
+  int l = 1;
+  int r = GetSize() + 1;
+  int mid = 0;
   while (l < r) {
     mid = l + (r - l) / 2;
     auto res = comparator(array_[mid].first, key);
     if (res == 1) {
       r = mid;
-    }  // >
-    else if (res == -1) {
+    } else if (res == -1) {
       l = mid + 1;
-    }  // <
-    else {
+    } else {
       break;
-    }  // =
+    }
   }
 
   if (comparator(array_[mid].first, key) == 0) {

@@ -48,7 +48,6 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   BPlusTreeInternalPage() = delete;
   BPlusTreeInternalPage(const BPlusTreeInternalPage &other) = delete;
 
-
   void Init(int max_size = INTERNAL_PAGE_SLOT_CNT);
 
   // Helper methods
@@ -60,28 +59,29 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   // My helper func
   auto IsFull() const -> bool;
   auto Insert2Inner(const KeyType &key, const ValueType &value, KeyComparator &comparator) -> bool;
+  auto BinarySearch(const KeyType &key, const KeyComparator &comparator) const -> int;
   auto GetValByKey(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
   auto GetIndexByKey(const KeyType &key, const KeyComparator &comparator) const -> int;
-  auto GetValByIndex(const int idx) const -> ValueType;
+  auto GetValByIndex(int idx) const -> ValueType;
   auto GetKVbyIndex(int index) const -> MappingType;
   auto GetArray() -> MappingType *;
-  void Insert2InnerByIdx(const MappingType newkv, int index);
+  void Insert2InnerByIdx(const MappingType newkv, int index);  // NOLINT
   void SetKVbyIndex(const MappingType &newkv, int index);
   void SetValByIndex(const ValueType &val, int index);
   void DeleteKVByIdx(int index);
 
-  void push_back(const MappingType &kv);
-  void push_front(const MappingType &kv);
-  auto pop_front() -> MappingType;
-  auto pop_back() -> MappingType;
+  void push_back(const MappingType &kv);   // NOLINT
+  void push_front(const MappingType &kv);  // NOLINT
+  auto pop_front() -> MappingType;         // NOLINT
+  auto pop_back() -> MappingType;          // NOLINT
 
-  auto SizeInvariantCheck(const int change) -> bool;
-  auto SplitInner(WritePageGuard &right_guard, const MappingType &newkey, const KeyComparator &comparator)
+  auto SizeInvariantCheck(int change) -> bool;
+  auto SplitInner(WritePageGuard &right_guard, const MappingType &newkey, const KeyComparator &comparator)  // NOLINT
       -> std::optional<KeyType>;
   auto SearchSiblingByKey(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
 
   void Debug();
-  auto getkey(const KeyType &key) -> int64_t;
+  auto Getkey(const KeyType &key) -> int64_t;
 
   auto ToString() const -> std::string {
     std::string kstr = "(";

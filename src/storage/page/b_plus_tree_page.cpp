@@ -17,10 +17,10 @@ auto BPlusTreePage::IsLeafPage() const -> bool { return this->page_type_ == Inde
 auto BPlusTreePage::IsSafe(BtreeAccessType access_type) const -> bool {
   if (access_type == BtreeAccessType::Delete) {
     /** 是否允许删一个 */
-    return size_ - 1 + (page_type_ == IndexPageType::INTERNAL_PAGE) >= (max_size_ + 1) / 2;
-  } else if (access_type == BtreeAccessType::Insert) {
+    return size_ - 1 + (page_type_ == IndexPageType::INTERNAL_PAGE) >= (max_size_ + 1) / 2;  // NOLINT
+  } else if (access_type == BtreeAccessType::Insert) {                                       // NOLINT
     /** 是否允许插入一个 */
-    return size_ + (page_type_ == IndexPageType::INTERNAL_PAGE) < max_size_;
+    return size_ + (page_type_ == IndexPageType::INTERNAL_PAGE) < max_size_;  // NOLINT
   } else {
     return false;
   }
@@ -34,14 +34,14 @@ void BPlusTreePage::SetPageType(IndexPageType page_type) { this->page_type_ = pa
 auto BPlusTreePage::GetSize() const -> int { return this->size_; }
 void BPlusTreePage::SetSize(int size) { this->size_ = size; }
 void BPlusTreePage::IncreaseSize(int amount) {
-  if(amount + size_ > max_size_) {
+  if (amount + size_ > max_size_) {
     LOG_DEBUG("%d+%d <= %d 错误", amount, size_, max_size_);
   }
   BUSTUB_ASSERT(amount + size_ <= max_size_, "PAGE: 超过最大数量\n");
   this->size_ += amount;
 }
 void BPlusTreePage::ChangeSizeBy(int amount) {
-  if(amount + size_ > max_size_) {
+  if (amount + size_ > max_size_) {
     LOG_DEBUG("%d+%d <= %d 错误", amount, size_, max_size_);
   }
   BUSTUB_ASSERT(amount + size_ <= max_size_, "PAGE: 超过最大数量\n");

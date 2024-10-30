@@ -84,6 +84,9 @@ BufferPoolManager::BufferPoolManager(size_t num_frames, DiskManager *disk_manage
     frames_.push_back(std::make_shared<FrameHeader>(i));
     free_frames_.push_back(static_cast<int>(i));
   }
+
+  access_cnt_.store(0);
+  bpm_hint_.store(0);
 }
 
 BufferPoolManager::~BufferPoolManager() = default;
@@ -152,6 +155,7 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
     return std::nullopt;
   }
   bpm_latch_->lock();
+  access_cnt_++;
   /** case1: 缓存命中 */
   if (page_table_.count(page_id) != 0U) {
     bpm_hint_++;
@@ -227,6 +231,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
     return std::nullopt;
   }
   bpm_latch_->lock();
+  access_cnt_++;
   /** 缓存命中 */
   if (page_table_.count(page_id) != 0U) {
     bpm_hint_++;

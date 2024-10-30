@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include <condition_variable>
+#include <condition_variable>  // NOLINT(build/c++11)
 #include <list>
 #include <memory>
 #include <shared_mutex>
@@ -28,8 +28,6 @@
 #include "storage/page/page_guard.h"
 
 #include "common/logger.h"
-
-#include <thread>
 
 namespace bustub {
 
@@ -120,6 +118,7 @@ class BufferPoolManager {
   auto GetPinCount(page_id_t page_id) -> std::optional<size_t>;
   // 统计缓存命中率
   std::atomic<uint64_t> bpm_hint_;
+  std::atomic<uint64_t> access_cnt_;
 
  private:
   const size_t num_frames_;
@@ -137,3 +136,5 @@ class BufferPoolManager {
   void SetFrame(std::shared_ptr<FrameHeader> &frame, frame_id_t &frame_id, page_id_t &page_id, AccessType &access_type);
 };
 }  // namespace bustub
+
+//

@@ -136,7 +136,7 @@ TEST(BPlusTreeTests, SequentialEdgeMixTest) {  // NOLINT
     for (auto key : keys) {
       index_key.SetFromInteger(key);
       tree.Remove(index_key);
-      if(key == 2) {
+      if (key == 2) {
         tree.Draw(bpm, "t.dot");
       }
       deleted.push_back(key);

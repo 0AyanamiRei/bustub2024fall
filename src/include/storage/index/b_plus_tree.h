@@ -90,13 +90,19 @@ class BPlusTree {
   void RemoveFromFile(const std::filesystem::path &file_name);
   void BatchOpsFromFile(const std::filesystem::path &file_name);
 
+  std::atomic<int64_t> split_cnt_;
+  std::atomic<int64_t> merge_cnt_;
+  std::atomic<int64_t> redistribute_cnt_;
+  std::atomic<int64_t> insert_cnt_;
+  std::atomic<int64_t> remove_cnt_;
+
  private:
   void ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out);
   void PrintTree(page_id_t page_id, const BPlusTreePage *page);
   auto ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree;
 
   // 辅助函数
-  auto getkey(const KeyType &key) -> int64_t;
+  auto Getkey(const KeyType &key) -> int64_t;
   void GetLeafWritePageGuard(const KeyType &key, Context &ctx, BtreeAccessType access_type);
   auto GetLeafReadPageGuard(const KeyType &key) -> ReadPageGuard;
   // 递归插入newkv
@@ -105,7 +111,6 @@ class BPlusTree {
   void FixUnderflowLeaf(Context &ctx, LeafPage *leaf_page, WritePageGuard &&leafpage_guard, const KeyType &key);
   // 递归删除内部节点
   void RemoveInternalPage(Context &ctx, InternalPage *update_page, WritePageGuard &&update_pageguard, int idx);
-
 
   // member variable
   std::string index_name_;

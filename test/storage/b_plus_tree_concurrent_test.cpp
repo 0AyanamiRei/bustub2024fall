@@ -149,9 +149,6 @@ void InsertTest1Call() {
 
     LaunchParallelTest(2, InsertHelper, &tree, keys);
 
-    tree.Draw(bpm, "t.dot");
-
-
     std::vector<RID> rids;
     GenericKey<8> index_key;
     for (auto key : keys) {
@@ -440,7 +437,7 @@ void MixTest2Call() {
     }
 
     // Check all reserved keys exist
-    size = 0;    
+    size = 0;
 
     for (auto iter = tree.Begin(); iter != tree.End(); ++iter) {
       const auto &pair = *iter;

@@ -62,28 +62,28 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   // My helper func
   auto IsFull() const -> bool;
   auto RemoveKey(const KeyType &key, const KeyComparator &comparator) -> bool;
-  auto Insert2Leaf(const KeyType &key, const ValueType &rid, const KeyComparator &comparator) -> bool;
-  void SetKVByIndex(const MappingType &kv, const int index);
+  auto Insert2Leaf(const KeyType &key, const ValueType &rid, const KeyComparator &comparator) -> bool;  // NOLINT
+  void SetKVByIndex(const MappingType &kv, int index);
   auto GetIdxByKey(const KeyType &key, const KeyComparator &comparator) const -> std::optional<int>;
   auto GetValByKey(const KeyType &key, const KeyComparator &comparator) const -> std::optional<RID>;
-  auto GetKeyByIndex(const int index) const -> KeyType;
+  auto GetKeyByIndex(int index) const -> KeyType;
   auto GetKVByIndex(int index) const -> const MappingType &;
-  auto GetArray() -> MappingType*;
+  auto GetArray() -> MappingType *;
 
-  void push_back(const MappingType &kv);
-  void push_front(const MappingType &kv);
-  auto pop_front() -> MappingType;
-  auto pop_back() -> MappingType;
+  void push_back(const MappingType &kv);   // NOLINT
+  void push_front(const MappingType &kv);  // NOLINT
+  auto pop_front() -> MappingType;         // NOLINT
+  auto pop_back() -> MappingType;          // NOLINT
 
-  auto SizeInvariantCheck(const int change) -> bool;
-  void MergeA2this(WritePageGuard &A);
+  auto SizeInvariantCheck(int change) -> bool;
+  void MergeA2this(WritePageGuard &&A);
   auto SplitLeaf(WritePageGuard &right_guard, MappingType newkv, const KeyComparator &comparator)
       -> std::optional<KeyType>;
-      
-  // keys[idx-1] < key <= keys[idx]
-  auto binarySearch(const KeyType &key, const KeyComparator &comparator) -> int;
 
-  auto getkey(const KeyType &key) -> int64_t;
+  // keys[idx] <= key < keys[idx+1]
+  auto BinarySearch(const KeyType &key, const KeyComparator &comparator) -> int;
+
+  auto Getkey(const KeyType &key) -> int64_t;
   void Debug();
 
   auto ToString() const -> std::string {

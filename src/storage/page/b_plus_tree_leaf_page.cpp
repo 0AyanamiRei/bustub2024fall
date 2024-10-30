@@ -46,17 +46,15 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) { this->next_page_id_ = next_page_id; }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType {
-  return array_[index].first;
-}
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType { return array_[index].first; }
 
 /** 已进行查重, 如果已存在则返回false */
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert2Leaf(const KeyType &key, const ValueType &value,
                                              const KeyComparator &comparator) -> bool {
   // 二分找到应该插入的位置
-  int pos = binarySearch(key, comparator);
-  if(pos < GetSize() && comparator(array_[pos].first, key) == 0U) {
+  int pos = BinarySearch(key, comparator);
+  if (pos < GetSize() && comparator(array_[pos].first, key) == 0U) {
     return false;
   }
   // 将array_[l~]往后移一位
@@ -66,31 +64,31 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert2Leaf(const KeyType &key, const ValueType
 
   array_[pos] = {key, value};
   IncreaseSize(1);
-  // LOG_INFO("插入array_[%d]叶子节点%ld", pos, getkey(key));
+  // LOG_INFO("插入array_[%d]叶子节点%ld", pos, Getkey(key));
   return true;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::SetKVByIndex(const MappingType &kv, const int index) { array_[index] = kv; }
+void B_PLUS_TREE_LEAF_PAGE_TYPE::SetKVByIndex(const MappingType &kv, int index) { array_[index] = kv; }
 
 /** 因为可能不存在,所以用std::optional<T>包一层*/
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetValByKey(const KeyType &key, const KeyComparator &comparator) const
     -> std::optional<RID> {
   int n = GetSize();
-  int l = 0, r = n, mid;
+  int l = 0;
+  int r = n;
+  int mid = 0;
   while (l < r) {
     mid = l + (r - l) / 2;
     auto res = comparator(array_[mid].first, key);
     if (res == 1) {
       r = mid;
-    }  // >
-    else if (res == -1) {
+    } else if (res == -1) {
       l = mid + 1;
-    }  // <
-    else {
+    } else {
       return array_[mid].second;
-    }  // =
+    }
   }
 
   return std::nullopt;
@@ -98,7 +96,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetValByKey(const KeyType &key, const KeyCompar
 
 /** 返回指定位置的key, -1表示队尾key */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetKeyByIndex(const int index) const -> KeyType {
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetKeyByIndex(int index) const -> KeyType {
   if (index == -1) {
     return array_[GetSize() - 1].first;
   }
@@ -119,19 +117,19 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetIdxByKey(const KeyType &key, const KeyComparator &comparator) const
     -> std::optional<int> {
   int n = GetSize();
-  int l = 0, r = n, mid;
+  int l = 0;
+  int r = n;
+  int mid = 0;
   while (l < r) {
     mid = l + (r - l) / 2;
     auto res = comparator(array_[mid].first, key);
-    if (res == 1) {
+    if (res == 1) {  // >
       r = mid;
-    }  // >
-    else if (res == -1) {
+    } else if (res == -1) {  // <
       l = mid + 1;
-    }  // <
-    else {
+    } else {  // =
       break;
-    }  // =
+    }
   }
   // 没有找到
   if (comparator(array_[mid].first, key)) {
@@ -180,13 +178,13 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::pop_front() -> MappingType {
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::SplitLeaf(WritePageGuard &right_guard, MappingType newkv,
                                            const KeyComparator &comparator) -> std::optional<KeyType> {
-  B_PLUS_TREE_LEAF_PAGE_TYPE *right_page = right_guard.AsMut<B_PLUS_TREE_LEAF_PAGE_TYPE>();
+  auto *right_page = right_guard.AsMut<B_PLUS_TREE_LEAF_PAGE_TYPE>();
 
   int max_size = GetSize();
   int left_nums = (GetMaxSize() + 1) / 2;
   // pos=[0~max_size]
-  int pos = binarySearch(newkv.first, comparator);
-  if(pos < GetSize() && comparator(array_[pos].first, newkv.first) == 0U) { 
+  int pos = BinarySearch(newkv.first, comparator);
+  if (pos < GetSize() && comparator(array_[pos].first, newkv.first) == 0U) {
     return std::nullopt;
   }
 
@@ -230,34 +228,27 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::SplitLeaf(WritePageGuard &right_guard, MappingT
 
 /** 将A的array按次序添加到自己的队尾 */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::MergeA2this(WritePageGuard &A) {
-  B_PLUS_TREE_LEAF_PAGE_TYPE *A_page = A.AsMut<B_PLUS_TREE_LEAF_PAGE_TYPE>();
-  auto A_size = A_page->GetSize();
-  MappingType *A_array = A_page->GetArray();
-  SetNextPageId(A_page->GetNextPageId());
+void B_PLUS_TREE_LEAF_PAGE_TYPE::MergeA2this(WritePageGuard &&A) {
+  auto *a_page = A.AsMut<B_PLUS_TREE_LEAF_PAGE_TYPE>();
+  int a_size = a_page->GetSize();
+  MappingType *a_array = a_page->GetArray();
+  next_page_id_ = a_page->GetNextPageId();
   /** 将A的array加入到自己队尾 */
-  for (int i = 0; i < A_size; i++) {
-    this->push_back(A_array[i]);
+  for (int i = 0; i < a_size; i++) {
+    array_[size_++] = a_array[i];
   }
 }
 
 /** 删除指定key */
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveKey(const KeyType &key, const KeyComparator &comparator) -> bool {
-  int n = GetSize();
-  int l = 0, r = n, mid;
-  while (l < r) {
-    mid = l + (r - l) / 2;
-    auto res = comparator(array_[mid].first, key);
-    if (res == 1) {  // >
-      r = mid;
-    } else if (res == -1) {  // <
-      l = mid + 1;
-    } else {  // =
+  int pos;
+  for (pos = 0; pos < size_; pos++) {
+    if (!comparator(array_[pos].first, key)) {
       break;
     }
   }
-  if (comparator(array_[mid].first, key)) {  // 不存在
+  if (pos >= size_) {
     return false;
   }
   for (int i = mid; i < n - 1; i++) {  // 删除指定key
@@ -269,16 +260,16 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveKey(const KeyType &key, const KeyComparat
 
 /** 返回节点状态, 是否处于underflow condition */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::SizeInvariantCheck(const int change) -> bool {
-  return GetSize() + change >= GetMinSize();
-}
-
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::SizeInvariantCheck(int change) -> bool { return GetSize() + change >= GetMinSize(); }
 
 /** 在keys中寻找大于等于key的最小下标*/
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::binarySearch(const KeyType &key, const KeyComparator &comparator) -> int {
-  int l = 0, r = GetSize(), mid;
-  while (l < r) {
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::BinarySearch(const KeyType &key, const KeyComparator &comparator) -> int {
+  // 寻找区间[keys[l], keys[l+1])
+  int l = 0;
+  int r = GetSize() - 1;
+  int mid = 0;
+  while (l <= r) {
     mid = l + (r - l) / 2;
     auto res = comparator(array_[mid].first, key);
     if (res < 0) {
@@ -292,7 +283,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::binarySearch(const KeyType &key, const KeyCompa
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::getkey(const KeyType &key) -> int64_t {
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::Getkey(const KeyType &key) -> int64_t {
   int64_t kval;
   memcpy(&kval, key.data_, sizeof(int64_t));
   return kval;
@@ -307,7 +298,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Debug() {
   std::cout << "\n";
   std::cout << "val: ";
   for (int i = 0; i < GetSize(); i++) {
-    std::cout << getkey(array_[i].first) << " ";
+    std::cout << Getkey(array_[i].first) << " ";
   }
   std::cout << "\n";
 }
