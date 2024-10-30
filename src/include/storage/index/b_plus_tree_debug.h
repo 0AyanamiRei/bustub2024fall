@@ -79,26 +79,6 @@ void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::filesystem::path &o
   out.close();
 }
 
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::filesystem::path &outf) {
-  if (IsEmpty()) {
-    LOG_WARN("Drawing an empty tree");
-    return;
-  }
-
-  std::ofstream out(outf);
-  if (!out.is_open()) {
-    LOG_ERROR("Failed to open the file");
-    return;
-  }
-
-  out << "digraph G {" << std::endl;
-  auto root_page_id = GetRootPageId();
-  auto guard = bpm->ReadPage(root_page_id);
-  ToGraph(guard.GetPageId(), guard.template As<BPlusTreePage>(), out);
-  out << "}" << std::endl;
-  out.close();
-}
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Print(BufferPoolManager *bpm) {
