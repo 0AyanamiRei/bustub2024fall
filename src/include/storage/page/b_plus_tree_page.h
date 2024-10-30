@@ -20,7 +20,6 @@
 
 namespace bustub {
 enum class BtreeAccessType { Search, Insert, Delete };
-enum class BtreeAccessType { Search, Insert, Delete };
 
 #define MappingType std::pair<KeyType, ValueType>
 
@@ -55,7 +54,6 @@ class BPlusTreePage {
 
   void SetPageType(IndexPageType page_type);
   void SetSize(int size);
-  void IncreaseSize(int amount);
   void IncreaseSize(int amount);
   void ChangeSizeBy(int amount);
   void SetMaxSize(int max_size);

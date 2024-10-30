@@ -239,7 +239,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MergeA2this(WritePageGuard &&A) {
   }
 }
 
-/** 删除指定key */
+/** 删除指定key @TODO 二分优化 */
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveKey(const KeyType &key, const KeyComparator &comparator) -> bool {
   int pos;
@@ -251,10 +251,10 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveKey(const KeyType &key, const KeyComparat
   if (pos >= size_) {
     return false;
   }
-  for (int i = mid; i < n - 1; i++) {  // 删除指定key
+  for (int i = pos; i + 1 < size_; i++) {  // 删除指定key
     array_[i] = array_[i + 1];
   }
-  this->IncreaseSize(-1);
+  size_--;
   return true;
 }
 
@@ -271,13 +271,12 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::BinarySearch(const KeyType &key, const KeyCompa
   int mid = 0;
   while (l <= r) {
     mid = l + (r - l) / 2;
-    auto res = comparator(array_[mid].first, key);
-    if (res < 0) {
+    auto res = comparator(key, array_[mid].first);
+    if (res > 0) {
       l = mid + 1;
-    }  // >
-    else {
-      r = mid;
-    }  // <=
+    } else {
+      r = mid - 1;
+    }
   }
   return l;
 }

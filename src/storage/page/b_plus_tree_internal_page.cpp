@@ -6,7 +6,6 @@
 // Identification: src/page/b_plus_tree_internal_page.cpp
 //
 // Copyright (c) 2018, Carnegie Mellon University Database Group
-// Copyright (c) 2018, Carnegie Mellon University Database Group
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,13 +19,6 @@ namespace bustub {
 /*****************************************************************************
  * HELPER METHODS AND UTILITIES
  *****************************************************************************/
-
-/**
- * 创建一个新的`internal page`之后的初始化函数:
- * 1. set page type
- * 2. set current size to zero
- * 3. set next page id
- * 4. set max size
 
 /**
  * 创建一个新的`internal page`之后的初始化函数:
@@ -179,17 +171,17 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::push_back(const MappingType &kv) {
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::push_front(const MappingType &kv) {
-  for (int i = GetSize(); i > 0; i--) {
-    array_[i] = array_[i - 1];
+  for (int i = size_; i >= 0; i--) {
+    array_[i + 1] = array_[i];
   }
   array_[0] = kv;
-  IncreaseSize(1);
+  size_++;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::pop_front() -> MappingType {
   MappingType ret = array_[0];
-  for (int i = 0, n = GetSize(); i < n; i++) {
+  for (int i = 0, n = GetSize(); i + 1 <= n; i++) {
     array_[i] = array_[i + 1];
   }
   IncreaseSize(-1);
@@ -201,8 +193,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::pop_back() -> MappingType { return array_[s
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert2InnerByIdx(const MappingType newkv, int index) {
-  int n = GetSize();
-  for (int i = index; i < n; i++) {
+  for (int i = GetSize(); i >= index; --i) {
     array_[i + 1] = array_[i];
   }
   array_[index] = newkv;
@@ -239,11 +230,10 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Getkey(const KeyType &key) -> int64_t {
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::DeleteKVByIdx(int index) {
-  int n = GetSize();
-  for (int i = index; i < n; i++) {
+  for (int i = index; i + 1 <= size_; i++) {
     array_[i] = array_[i + 1];
   }
-  IncreaseSize(-1);
+  size_--;
 }
 
 /** 内部节点的Size是按照指针的数量来算的 */
