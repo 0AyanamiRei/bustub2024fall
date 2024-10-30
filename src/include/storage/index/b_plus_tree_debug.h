@@ -57,7 +57,6 @@ void BPLUSTREE_TYPE::RemoveFromFile(const std::filesystem::path &file_name) {
   }
 }
 
-
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::filesystem::path &outf) {
   if (IsEmpty()) {
@@ -78,7 +77,6 @@ void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::filesystem::path &o
   out << "}" << std::endl;
   out.close();
 }
-
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Print(BufferPoolManager *bpm) {
@@ -127,7 +125,6 @@ void BPLUSTREE_TYPE::PrintTree(page_id_t page_id, const BPlusTreePage *page) {
   }
 }
 
-
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::DrawBPlusTree() -> std::string {
   if (IsEmpty()) {
@@ -140,9 +137,6 @@ auto BPLUSTREE_TYPE::DrawBPlusTree() -> std::string {
 
   return out_buf.str();
 }
-
-
-
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out) {
@@ -256,7 +250,6 @@ void BPLUSTREE_TYPE::BatchOpsFromFile(const std::filesystem::path &file_name) {
   }
   input.close();
 }
-
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree {
