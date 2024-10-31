@@ -10,6 +10,7 @@
 #include "linenoise/linenoise.h"
 #include "utf8proc/utf8proc.h"
 
+/**< 计算UTF-8字符串的宽度*/
 auto GetWidthOfUtf8(const void *beg, const void *end, size_t *width) -> int {
   size_t computed_width = 0;
   utf8proc_ssize_t n;
@@ -29,6 +30,7 @@ auto GetWidthOfUtf8(const void *beg, const void *end, size_t *width) -> int {
 auto main(int argc, char **argv) -> int {
   ft_set_u8strwid_func(&GetWidthOfUtf8);
 
+  /**< 查看BusTubInstance中含有哪些部分 */
   auto bustub = std::make_unique<bustub::BusTubInstance>("test.bustub");
 
   auto default_prompt = "bustub> ";
@@ -47,9 +49,11 @@ auto main(int argc, char **argv) -> int {
     }
   }
 
+  /**< 生成模拟表 */
   bustub->GenerateMockTable();
 
   if (bustub->buffer_pool_manager_ != nullptr) {
+    /**< 生成测试表 */
     bustub->GenerateTestTable();
   }
 
@@ -67,6 +71,7 @@ auto main(int argc, char **argv) -> int {
     bool first_line = true;
     while (true) {
       std::string context_prompt = prompt;
+      /** @todo 可能是故障恢复 */
       auto *txn = bustub->CurrentManagedTxn();
       if (txn != nullptr) {
         if (txn->GetTransactionState() != bustub::TransactionState::RUNNING) {
@@ -88,7 +93,7 @@ auto main(int argc, char **argv) -> int {
           break;
         }
         query += " ";
-      } else {
+      } else { /**< 一般都没有启动tty */
         std::string query_line;
         std::cout << line_prompt;
         std::getline(std::cin, query_line);
@@ -104,12 +109,14 @@ auto main(int argc, char **argv) -> int {
       first_line = false;
     }
 
-    if (!disable_tty) {
+    /**< 添加历史记录 */
+    if (!disable_tty) { /**< 通常disable_tty为false */
       linenoiseHistoryAdd(query.c_str());
     }
 
     try {
       auto writer = bustub::FortTableWriter();
+      // std::cout << "接受的命令: " << query << std::endl;
       bustub->ExecuteSql(query, writer);
       for (const auto &table : writer.tables_) {
         std::cout << table << std::flush;
