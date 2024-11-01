@@ -90,14 +90,17 @@ class FrameHeader {
 };
 
 /**
- * @brief The declaration of the `BufferPoolManager` class.
- *
- * As stated in the writeup, the buffer pool is responsible for moving physical pages of data back and forth from
- * buffers in main memory to persistent storage. It also behaves as a cache, keeping frequently used pages in memory for
- * faster access, and evicting unused or cold pages back out to storage.
- *
- * Make sure you read the writeup in its entirety before attempting to implement the buffer pool manager. You also need
- * to have completed the implementation of both the `LRUKReplacer` and `DiskManager` classes.
+ * @brief 缓冲池组件类, 负责在主存中的缓冲区和持久存储之间来回移动数据
+ * 
+ * - `LRUKReplacer`提供淘汰策略, 将未使用或者cold-page逐出缓冲区
+ * 
+ * - `DiskManager`提供持久化存储, 即读写磁盘的服务
+ * 
+ * - `LogManager`提供容错, 故障恢复等服务
+ * 
+ * @todo 探索淘汰策略, 加入淘汰优先级, 淘汰模式选项等功能
+ * @todo 加入预取(Prefetch), 旁路缓冲(Bypass)等常规优化技术
+ * @todo 探索更多工作负载下的缓冲池性能
  */
 class BufferPoolManager {
  public:

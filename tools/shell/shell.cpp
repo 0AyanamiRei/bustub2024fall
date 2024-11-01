@@ -49,11 +49,11 @@ auto main(int argc, char **argv) -> int {
     }
   }
 
-  /**< 生成模拟表 */
+  /**< FOR TEST ONLY 生成模拟表 */
   bustub->GenerateMockTable();
 
   if (bustub->buffer_pool_manager_ != nullptr) {
-    /**< 生成测试表 */
+    /**< FOR TEST ONLY 生成测试表 */
     bustub->GenerateTestTable();
   }
 
@@ -61,6 +61,7 @@ auto main(int argc, char **argv) -> int {
 
   std::cout << "Welcome to the BusTub shell! Type \\help to learn more." << std::endl << std::endl;
 
+  /**< 设置命令历史记录的最大值, 设置多行输入模式 */
   linenoiseHistorySetMaxLen(1024);
   linenoiseSetMultiLine(1);
 
@@ -71,7 +72,6 @@ auto main(int argc, char **argv) -> int {
     bool first_line = true;
     while (true) {
       std::string context_prompt = prompt;
-      /** @todo 可能是故障恢复 */
       auto *txn = bustub->CurrentManagedTxn();
       if (txn != nullptr) {
         if (txn->GetTransactionState() != bustub::TransactionState::RUNNING) {
@@ -116,7 +116,6 @@ auto main(int argc, char **argv) -> int {
 
     try {
       auto writer = bustub::FortTableWriter();
-      // std::cout << "接受的命令: " << query << std::endl;
       bustub->ExecuteSql(query, writer);
       for (const auto &table : writer.tables_) {
         std::cout << table << std::flush;
