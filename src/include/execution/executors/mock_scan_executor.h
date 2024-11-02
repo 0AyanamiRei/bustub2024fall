@@ -26,9 +26,7 @@ namespace bustub {
 extern const char *mock_table_list[];
 auto GetMockTableSchemaOf(const std::string &table) -> Schema;
 
-/**
- * The MockScanExecutor executor executes a sequential table scan for tests.
- */
+// The MockScanExecutor executor executes a sequential table scan for tests.
 class MockScanExecutor : public AbstractExecutor {
  public:
   /**

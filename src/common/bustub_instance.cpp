@@ -285,8 +285,8 @@ auto BusTubInstance::ExecuteSqlTxn(const std::string &sql, ResultWriter &writer,
   bustub::Binder binder(*catalog_);
   binder.ParseAndSave(sql);
   l.unlock();
-
-  /**< 开始执行? @todo 查看一下binder.statement_nodes_中的内容 */
+  
+  /**< 开始执行? @todo 查看statement的结构 */
   for (auto *stmt : binder.statement_nodes_) {
     auto statement = binder.BindStatement(stmt);
 
