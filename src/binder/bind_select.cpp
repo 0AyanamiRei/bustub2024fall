@@ -213,6 +213,7 @@ auto Binder::BindSelect(duckdb_libpgquery::PGSelectStmt *pg_stmt) -> std::unique
   // we should have thrown an exception. However, this is too tedious to implement (need to check
   // every field manually). Therefore, I'd prefer warning users that the binder is not complete
   // in project write-ups / READMEs.
+  // 看起来迟先生没干完活, 不过看起来是有group by和having语句的
 
   return std::make_unique<SelectStatement>(std::move(table), std::move(select_list), std::move(where),
                                            std::move(group_by), std::move(having), std::move(limit_count),
@@ -326,6 +327,7 @@ auto Binder::BindRangeVar(duckdb_libpgquery::PGRangeVar *table_ref) -> std::uniq
   if (table_ref->alias != nullptr) {
     return BindBaseTableRef(table_ref->relname, std::make_optional(table_ref->alias->aliasname));
   }
+  // table_ref->relname = "__mock_table_1"
   return BindBaseTableRef(table_ref->relname, std::nullopt);
 }
 

@@ -23,6 +23,12 @@ namespace bustub {
 
 /**
  * The SeqScanExecutor executor executes a sequential table scan.
+ * 
+ * 顺序扫描`Next()`的输出为`tuple`和其对应的`RID`(record identifier)
+ * 的"copy"
+ * 
+ * @warning 每个`tuple`应该检查`TupleMeta`中的字段`is_deleted_`, 如果
+ * 为true那么不应该emit该`tuple`
  */
 class SeqScanExecutor : public AbstractExecutor {
  public:
@@ -48,7 +54,8 @@ class SeqScanExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 
  private:
-  /** The sequential scan plan node to be executed */
-  const SeqScanPlanNode *plan_;
+  const SeqScanPlanNode *plan_;  /**< The sequential scan plan node to be executed */
+  TableIterator iter_;
+
 };
 }  // namespace bustub

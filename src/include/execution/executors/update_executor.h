@@ -58,13 +58,9 @@ class UpdateExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 
  private:
-  /** The update plan node to be executed */
-  const UpdatePlanNode *plan_;
-
-  /** Metadata identifying the table that should be updated */
-  const TableInfo *table_info_;
-
-  /** The child executor to obtain value from */
-  std::unique_ptr<AbstractExecutor> child_executor_;
+  const UpdatePlanNode *plan_; /** The update plan node to be executed */
+  const TableInfo *table_info_; /** Metadata identifying the table that should be updated */
+  std::unique_ptr<AbstractExecutor> child_executor_; /** The child executor to obtain value from */
+  bool first_use_;
 };
 }  // namespace bustub

@@ -55,8 +55,9 @@ class InsertExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); };
 
  private:
-  /** The insert plan node to be executed*/
-  const InsertPlanNode *plan_;
+  const InsertPlanNode *plan_; /**< The insert plan node to be executed*/
+  bool first_use_;
+  std::unique_ptr<AbstractExecutor> child_executor_;
 };
 
 }  // namespace bustub

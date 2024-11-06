@@ -61,8 +61,7 @@ class IndexScanPlanNode : public AbstractPlanNode {
    */
   AbstractExpressionRef filter_predicate_;
 
-  /**
-   * The constant value keys to lookup.
+  /** The constant value keys to lookup.
    * For example when dealing "WHERE v = 1" we could store the constant value 1 here
    */
   std::vector<AbstractExpressionRef> pred_keys_;

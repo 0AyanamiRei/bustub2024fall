@@ -546,7 +546,10 @@ auto GetFunctionOf(const MockScanPlanNode *plan) -> std::function<Tuple(size_t)>
 }
 
 MockScanExecutor::MockScanExecutor(ExecutorContext *exec_ctx, const MockScanPlanNode *plan)
-    : AbstractExecutor{exec_ctx}, plan_{plan}, func_(GetFunctionOf(plan)), size_(GetSizeOf(plan)) {
+    : AbstractExecutor{exec_ctx},
+      plan_{plan}, /**< (TODO) 为什么这里区分使用列表初始化和直接初始化? */
+      func_(GetFunctionOf(plan)),
+      size_(GetSizeOf(plan)) {
   if (GetShuffled(plan)) {
     for (size_t i = 0; i < size_; i++) {
       shuffled_idx_.push_back(i);

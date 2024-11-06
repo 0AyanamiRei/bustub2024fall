@@ -41,9 +41,7 @@ using index_oid_t = uint32_t;
 
 enum class IndexType { BPlusTreeIndex, HashTableIndex, STLOrderedIndex, STLUnorderedIndex };
 
-/**
- * The TableInfo class maintains metadata about a table.
- */
+/** @brief The TableInfo class maintains metadata about a table.*/
 struct TableInfo {
   /**
    * Construct a new TableInfo instance.
@@ -53,20 +51,18 @@ struct TableInfo {
    * @param oid The unique OID for the table
    */
   TableInfo(Schema schema, std::string name, std::unique_ptr<TableHeap> &&table, table_oid_t oid)
-      : schema_{std::move(schema)}, name_{std::move(name)}, table_{std::move(table)}, oid_{oid} {}
-  /** The table schema */
-  Schema schema_;
-  /** The table name */
-  const std::string name_;
-  /** An owning pointer to the table heap */
-  std::unique_ptr<TableHeap> table_;
-  /** The table OID */
-  const table_oid_t oid_;
+      : schema_{std::move(schema)},
+        name_{std::move(name)},
+        table_{std::move(table)},
+        oid_{oid} {}
+
+  Schema schema_;                    /**< The table schema */
+  const std::string name_;           /**< The table name */
+  std::unique_ptr<TableHeap> table_; /**< An owning pointer to the table heap */
+  const table_oid_t oid_;            /**< The table OID */
 };
 
-/**
- * The IndexInfo class maintains metadata about a index.
- */
+/** The IndexInfo class maintains metadata about a index. */
 struct IndexInfo {
   /**
    * Construct a new IndexInfo instance.
@@ -87,22 +83,14 @@ struct IndexInfo {
         key_size_{key_size},
         is_primary_key_{is_primary_key},
         index_type_(index_type) {}
-  /** The schema for the index key */
-  Schema key_schema_;
-  /** The name of the index */
-  std::string name_;
-  /** An owning pointer to the index */
-  std::unique_ptr<Index> index_;
-  /** The unique OID for the index */
-  index_oid_t index_oid_;
-  /** The name of the table on which the index is created */
-  std::string table_name_;
-  /** The size of the index key, in bytes */
-  const size_t key_size_;
-  /** Is primary key index? */
-  bool is_primary_key_;
-  /** The index type */
-  IndexType index_type_;
+  Schema key_schema_; /**< The schema for the index key */
+  std::string name_;  /**< The name of the index */
+  std::unique_ptr<Index> index_;  /**< An owning pointer to the index */
+  index_oid_t index_oid_;  /**< The unique OID for the index */
+  std::string table_name_; /**< The name of the table on which the index is created */
+  const size_t key_size_;  /**< The size of the index key, in bytes */
+  bool is_primary_key_;    /**< Is primary key index? */
+  IndexType index_type_;   /**< The index type */
 };
 
 /**

@@ -22,6 +22,7 @@ auto Optimizer::OptimizeMergeFilterScan(const AbstractPlanNodeRef &plan) -> Abst
     const auto &filter_plan = dynamic_cast<const FilterPlanNode &>(*optimized_plan);
     BUSTUB_ASSERT(optimized_plan->children_.size() == 1, "must have exactly one children");
     const auto &child_plan = *optimized_plan->children_[0];
+    
     if (child_plan.GetType() == PlanType::SeqScan) {
       const auto &seq_scan_plan = dynamic_cast<const SeqScanPlanNode &>(child_plan);
       if (seq_scan_plan.filter_predicate_ == nullptr) {

@@ -53,6 +53,7 @@ void Binder::SaveParseTree(duckdb_libpgquery::PGList *tree) {
 auto Binder::BindStatement(duckdb_libpgquery::PGNode *stmt) -> std::unique_ptr<BoundStatement> {
   switch (stmt->type) {
     case duckdb_libpgquery::T_PGRawStmt:
+      // T_PGRawStmt: 原始SQL语句节点, 进一步解包 -> PGRawStmt 
       return BindStatement(reinterpret_cast<duckdb_libpgquery::PGRawStmt *>(stmt)->stmt);
     case duckdb_libpgquery::T_PGCreateStmt:
       return BindCreate(reinterpret_cast<duckdb_libpgquery::PGCreateStmt *>(stmt));

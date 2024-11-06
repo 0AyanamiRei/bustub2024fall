@@ -30,13 +30,14 @@ auto Optimizer::OptimizeMergeProjection(const AbstractPlanNodeRef &plan) -> Abst
                    [](auto &&child_col, auto &&proj_col) {
                      // TODO(chi): consider VARCHAR length
                      return child_col.GetType() == proj_col.GetType();
-                   })) {
+                   })) { /**< e.g proj{a, b, c} == child{a, b, c} */
       const auto &exprs = projection_plan.GetExpressions();
       // If all items are column value expressions
       bool is_identical = true;
       for (size_t idx = 0; idx < exprs.size(); idx++) {
         auto column_value_expr = dynamic_cast<const ColumnValueExpression *>(exprs[idx].get());
         if (column_value_expr != nullptr) {
+          /**< 检查proj{a, b, c}和child{a, b, c}每一行内容是否相同 */
           if (column_value_expr->GetTupleIdx() == 0 && column_value_expr->GetColIdx() == idx) {
             continue;
           }
@@ -44,7 +45,7 @@ auto Optimizer::OptimizeMergeProjection(const AbstractPlanNodeRef &plan) -> Abst
         is_identical = false;
         break;
       }
-      if (is_identical) {
+      if (is_identical) { /**< 删除冗余的投影, 恒等映射*/
         auto plan = child_plan->CloneWithChildren(child_plan->GetChildren());
         plan->output_schema_ = std::make_shared<Schema>(projection_schema);
         return plan;
@@ -55,3 +56,17 @@ auto Optimizer::OptimizeMergeProjection(const AbstractPlanNodeRef &plan) -> Abst
 }
 
 }  // namespace bustub
+
+
+/******************************************
+ * @example
+ * 1. 删除冗余的projection
+ *   Proj (a, b, c)
+ *        |            ->     scan (a, b, c)
+ *   scan (a, b, c)
+ * 
+ * 2. 其余情况都不能删除projection
+ *   Proj (a, b)
+ *        |
+ *   scan (a, b, c)
+ ******************************************/

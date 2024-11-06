@@ -57,7 +57,7 @@ class UpdatePlanNode : public AbstractPlanNode {
   /** The table to be updated. */
   table_oid_t table_oid_;
 
-  /** The new expression at each column */
+  /** The new expression at each column, 类型是`ColumnValueExpression`*/
   std::vector<AbstractExpressionRef> target_expressions_;
 
  protected:

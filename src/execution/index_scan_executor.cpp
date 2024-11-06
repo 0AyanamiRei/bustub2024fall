@@ -13,10 +13,23 @@
 
 namespace bustub {
 IndexScanExecutor::IndexScanExecutor(ExecutorContext *exec_ctx, const IndexScanPlanNode *plan)
-    : AbstractExecutor(exec_ctx) {}
+    : AbstractExecutor{exec_ctx},
+      plan_{plan}, 
+      index_(exec_ctx->GetCatalog()->GetIndex(plan->index_oid_)->index_.get()) {}
 
-void IndexScanExecutor::Init() { throw NotImplementedException("IndexScanExecutor is not implemented"); }
+void IndexScanExecutor::Init() {}
 
-auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool { return false; }
+auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
+  std::vector<RID> result;
+  for(auto &expr : plan_->pred_keys_) {
+    std::vector<Value> values{};
+    values.reserve(GetOutputSchema().GetColumnCount());
+    values.push_back(expr->Evaluate(tuple, GetOutputSchema()));
+    *tuple = Tuple{values, &GetOutputSchema()};
+    index_->ScanKey(*tuple, &result, exec_ctx_->GetTransaction());
+    
+  }
+
+}
 
 }  // namespace bustub

@@ -41,7 +41,7 @@ class SeqScanPlanNode : public AbstractPlanNode {
         table_name_(std::move(table_name)),
         filter_predicate_(std::move(filter_predicate)) {}
 
-  /** @return The type of the plan node */
+  /** @return The ty   of the plan node */
   auto GetType() const -> PlanType override { return PlanType::SeqScan; }
 
   /** @return The identifier of the table that should be scanned */
