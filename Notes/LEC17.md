@@ -93,3 +93,32 @@ $T_i$的写阶段覆盖了$T_j$的读阶段, 持续到了$T_j$的写阶段, 除�
 
 那么对写写冲突做的集合验证, 可能存在的浪费情形如上图, 不过我们可以尽量把"询问是否存在写写冲突"这种逻辑在*validation test*的代码里靠后执行, 尽可能来减少上图这种情况发生的频率.
 
+***总结OCC***
+
+当大多数事务都是*read-only*时, 少部分*write*事务的数据集又不相交, *OCC*的策略效果就非常显著. 不过也有一部分缺陷:
+
+1. 在*Read phase*我们将数据*copy*到了本地这是一个开销;
+2. *Validation/Write phase*是潜在的瓶颈, 如果这里的并行做的不好, 可能导致大多数事务都阻塞在这两个阶段;
+3. 验证不通过, 终止事务的开销比较大
+
+相关文献, 按时间线(TODO : READ)
+
+1. 理论研究: *On Optimistic Methods for Concurrency Control 1981*
+2. 理论研究: *Optimistic Methods for Concurrency Control in Distributed Database Systems 1981*
+3. 理论研究: *Problems of Optimistic Concurrency Control in Distributed Database Systems 1982*
+4. 理论研究: *Observations on optimistic concurrency control schemes 1984*
+5. 原型系统: *Distributed transaction management in jasmin VLDB 1984* 
+6. 理论研究: *Certification by intervals of timestamps in distributeddatabase systems 1984* 
+7. 生产系统: *Megastore: Providing Scalable, Highly Available Storage for Interactive Services CIDR 2011*
+8. 生产系统: *High-Performance Concurrency Control Mechanisms for Main-Memory Databases VLDB 2012*
+9. 生产系统: *F1: A Distributed SQL Database That Scales VLDB 2013*
+10. 原型系统: *MaaT: Effective and scalable coordination of distributedtransactions in the cloud VLDB 2014*
+11. 原型系统: *Centiman: Elastic, High Performance Optimistic Concurrency Control by Watermarking 2015*
+12. ? : *Opportunities for Optimism in Contended MainMemory Multicore Transactions VLDB 2020*
+
+
+
+## The Phantom Problem
+
+产生的源头应该可以认为是为了更大的并行程度从而把锁粒度调整到*record*, 而对
+
