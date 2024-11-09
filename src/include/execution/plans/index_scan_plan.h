@@ -63,6 +63,8 @@ class IndexScanPlanNode : public AbstractPlanNode {
 
   /** The constant value keys to lookup.
    * For example when dealing "WHERE v = 1" we could store the constant value 1 here
+   * WHERE v1 = 1 or v1 = 2 or v1 = 3; pred_keys_ = {1, 2, 3}
+   * ConstantValueExpression
    */
   std::vector<AbstractExpressionRef> pred_keys_;
 

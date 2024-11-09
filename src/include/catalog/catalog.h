@@ -195,7 +195,7 @@ class Catalog {
    * @param table_name The name of the table
    * @param schema The schema of the table
    * @param key_schema The schema of the key
-   * @param key_attrs Key attributes
+   * @param key_attrs Key attributes (col_id)
    * @param keysize Size of the key
    * @param hash_function The hash function for the index
    * @return A shared pointer to the metadata of the new table
@@ -205,6 +205,13 @@ class Catalog {
                    const Schema &key_schema, const std::vector<uint32_t> &key_attrs, std::size_t keysize,
                    HashFunction<KeyType> hash_function, bool is_primary_key = false,
                    IndexType index_type = IndexType::BPlusTreeIndex) -> std::shared_ptr<IndexInfo> {
+    
+    // DEBUG
+    // std::cout << index_name << std::endl << table_name << std::endl;
+    // auto a = key_schema;
+    // auto b = schema;
+    // auto c = key_attrs;
+    
     // Reject the creation request for nonexistent table
     if (table_names_.find(table_name) == table_names_.end()) {
       return NULL_INDEX_INFO;

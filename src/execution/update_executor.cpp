@@ -37,15 +37,18 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     table_info_->table_->UpdateTupleMeta({0, true}, *rid);
     /**< 本地修改tuple */
     std::vector<Value> values{};
-    values.reserve(GetOutputSchema().GetColumnCount());
+    values.reserve(child_executor_->GetOutputSchema().GetColumnCount());
     for(auto &expr : plan_->target_expressions_) {
       values.push_back(expr->Evaluate(tuple, child_executor_->GetOutputSchema()));
     }
     *tuple = Tuple{values, &child_executor_->GetOutputSchema()};
     /**< 插入tuple */
-    *rid = table_info_->table_->InsertTuple({0, false}, *tuple, nullptr, nullptr, plan_->table_oid_).value();
+    tuple->SetRid(table_info_->table_->InsertTuple({0, false}, *tuple, nullptr, nullptr, plan_->table_oid_).value());
     for(auto &index_info_ : index_info_vec_) {
-      index_info_->index_->InsertEntry(*tuple, *rid, exec_ctx_->GetTransaction());
+      auto &index_ = index_info_->index_;
+      // std::cout << index_->GetMetadata()->ToString() << std::endl;
+      index_->InsertEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
+                          tuple->GetRid(), exec_ctx_->GetTransaction());
     }
     /**< 更新rows计数 */
     cnt++;

@@ -36,10 +36,13 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   auto index_info_vec_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
   while(child_executor_->Next(tuple, rid)) {
     /**< 插入tuple */
-    table_info_->table_->InsertTuple({0, false}, *tuple, nullptr, nullptr, plan_->table_oid_);
+    tuple->SetRid(table_info_->table_->InsertTuple({0, false}, *tuple, nullptr, nullptr, plan_->table_oid_).value());
     /**< 修改相关Index */
     for(auto &index_info_ : index_info_vec_) {
-      index_info_->index_->InsertEntry(*tuple, *rid, exec_ctx_->GetTransaction());
+      auto &index_ = index_info_->index_;
+      // std::cout << index_->GetMetadata()->ToString() << std::endl;
+      index_->InsertEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
+                          tuple->GetRid(), exec_ctx_->GetTransaction());
     }
     /**< 插入rows计数 */
     cnt++;
