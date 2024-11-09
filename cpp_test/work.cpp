@@ -1,20 +1,36 @@
 #include <iostream>
 #include <vector>
+#include <cstdint>
+#include <atomic>
 
 using namespace std;
 
+#define INF UINT64_MAX
 
+struct version {
+  std::atomic<uint64_t> ver{0};
+  uint64_t begin_ts{0};
+  uint64_t end_ts{0};
+  uint64_t read_ts{0};
+  [[maybe_unused]] version *ptr;
+  char data;
+};
+
+class MVTO {
+public:
+  MVTO (std::vector<version> &&Q) : Q_(Q) {}
+  auto Read(uint64_t ts) -> const char;
+  auto Write(uint64_t ts, char data) -> bool;
+private:
+  std::vector<version> Q_;
+};
 
 
 int main() {
+  MVTO mvto({{0, 0, 0, 'A'}});
 
-  vector<int> a = {2, 4, 6};
-  vector<int> b = {1, 3, 5}; 
-  
-  if (std::equal(a.begin(), a.end(), b.begin(), b.end(), [](auto &&x, auto &&y) { cout << max (x, y) << endl; ;return x > y;}) ) {
-    cout << "true" << endl;
-  } else {
-    cout << "false" << endl;
-  }
-  return 0;
+}
+
+auto MVTO::Read(uint64_t ts) -> const char {
+
 }
