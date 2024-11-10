@@ -45,16 +45,25 @@ class SimpleAggregationHashTable {
   /** @return The initial aggregate value for this aggregation executor */
   auto GenerateInitialAggregateValue() -> AggregateValue {
     std::vector<Value> values{};
-    for (const auto &agg_type : agg_types_) {
-      switch (agg_type) {
+    for (int i = 0; i < static_cast<int>(agg_types_.size()); i ++) {
+      switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
           // Count start starts at zero.
           values.emplace_back(ValueFactory::GetIntegerValue(0));
           break;
         case AggregationType::CountAggregate:
+          // Count starts at zero.
+          values.emplace_back(ValueFactory::GetIntegerValue(0));
+          break;
         case AggregationType::SumAggregate:
+          values.emplace_back(ValueFactory::GetNullValueByType(agg_exprs_[i]->GetReturnType().GetType()));
+          break;
         case AggregationType::MinAggregate:
+          values.emplace_back(ValueFactory::GetNullValueByType(agg_exprs_[i]->GetReturnType().GetType()));
+          break;
         case AggregationType::MaxAggregate:
+          values.emplace_back(ValueFactory::GetNullValueByType(agg_exprs_[i]->GetReturnType().GetType()));
+          break;
           // Others starts at null.
           values.emplace_back(ValueFactory::GetNullValueByType(TypeId::INTEGER));
           break;
@@ -71,13 +80,43 @@ class SimpleAggregationHashTable {
    * @param input The input value
    */
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
+    /**< */
     for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
       switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
+          result->aggregates_[i] = result->aggregates_[i].Add(Value{TypeId::INTEGER, 1});
+          break;
         case AggregationType::CountAggregate:
+          if(!input.aggregates_[i].IsNull()) {
+            result->aggregates_[i] = result->aggregates_[i].Add(Value{TypeId::INTEGER, 1});
+          }
+          break;
         case AggregationType::SumAggregate:
+          if(result->aggregates_[i].IsNull()) { /**< 第一次更新 */
+            result->aggregates_[i] = input.aggregates_[i];
+          } else {
+            if(!input.aggregates_[i].IsNull()) {
+              result->aggregates_[i] = result->aggregates_[i].Add(input.aggregates_[i]);
+            }
+          }
+          break;
         case AggregationType::MinAggregate:
+          if(result->aggregates_[i].IsNull()) { /**< 第一次更新 */
+            result->aggregates_[i] = input.aggregates_[i];
+          } else {
+            if(!input.aggregates_[i].IsNull()) {
+              result->aggregates_[i] = result->aggregates_[i].Min(input.aggregates_[i]);
+            }
+          }
+          break;
         case AggregationType::MaxAggregate:
+          if(result->aggregates_[i].IsNull()) { /**< 第一次更新 */
+            result->aggregates_[i] = input.aggregates_[i];
+          } else {
+            if(!input.aggregates_[i].IsNull()) {
+              result->aggregates_[i] = result->aggregates_[i].Max(input.aggregates_[i]);
+            }
+          }
           break;
       }
     }
@@ -203,9 +242,11 @@ class AggregationExecutor : public AbstractExecutor {
   std::unique_ptr<AbstractExecutor> child_executor_;
 
   /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
 
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
+
+  bool first_;
 };
 }  // namespace bustub

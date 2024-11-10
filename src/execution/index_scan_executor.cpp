@@ -27,11 +27,6 @@ auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     return false;
   }
 
-/*
-index_->InsertEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(),
-                                        index_->GetKeyAttrs()), tuple->GetRid(), exec_ctx_->GetTransaction());
-*/
-
   auto &expr = plan_->pred_keys_.back();
   auto &index_ = exec_ctx_->GetCatalog()->GetIndex(plan_->index_oid_)->index_;
 

@@ -1,36 +1,72 @@
 #include <iostream>
 #include <vector>
-#include <cstdint>
-#include <atomic>
 
 using namespace std;
 
-#define INF UINT64_MAX
+enum class TypeId { BOOLEAN, INTEGER };
 
-struct version {
-  std::atomic<uint64_t> ver{0};
-  uint64_t begin_ts{0};
-  uint64_t end_ts{0};
-  uint64_t read_ts{0};
-  [[maybe_unused]] version *ptr;
-  char data;
+struct Value {
+  union {
+    bool boolean_;
+    int integer_;
+  } value_;
 };
 
-class MVTO {
+class Base {
 public:
-  MVTO (std::vector<version> &&Q) : Q_(Q) {}
-  auto Read(uint64_t ts) -> const char;
-  auto Write(uint64_t ts, char data) -> bool;
-private:
-  std::vector<version> Q_;
+  virtual ~Base() = default;
+  virtual TypeId GetType() const = 0;
+  virtual Value GetValue() const = 0;
 };
 
+class IntBase : public Base {
+public:
+  IntBase(int i) {
+    value_.value_.integer_ = i;
+  }
+  ~IntBase() override = default;
+  TypeId GetType() const override {
+    return TypeId::INTEGER;
+  }
+  Value GetValue() const override {
+    return value_;
+  }
+private:
+  Value value_;
+};
+
+class BoolBase : public Base {
+public:
+  BoolBase(bool i) {
+    value_.value_.boolean_ = i;
+  }
+  ~BoolBase() override = default;
+  TypeId GetType() const override {
+    return TypeId::BOOLEAN;
+  }
+  Value GetValue() const override {
+    return value_;
+  }
+private:
+  Value value_;
+};
 
 int main() {
-  MVTO mvto({{0, 0, 0, 'A'}});
+  std::vector<Base*> base;
+  IntBase intbase1(4);
+  IntBase intbase2(4);
+  BoolBase boolbase1(true);
+  BoolBase boolbase2(false);
+  base.push_back(&intbase1);
+  base.push_back(&boolbase1);
+  base.push_back(&intbase2);
+  base.push_back(&boolbase2);
 
-}
-
-auto MVTO::Read(uint64_t ts) -> const char {
-
+  for (auto &b : base) {
+    if(b->GetType() == TypeId::BOOLEAN) {
+      cout << "BOOLEAN: " << b->GetValue().value_.boolean_ << endl;
+    } else if(b->GetType() == TypeId::INTEGER) {
+      cout << "INTEGER: " << b->GetValue().value_.integer_ << endl;
+    }
+  }
 }
