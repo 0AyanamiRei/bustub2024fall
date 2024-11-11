@@ -1,14 +1,18 @@
-create table t1(v1 int, v2 int, v3 int);
-insert into t1 values (1, 50, 645), (2, 40, 721), (4, 20, 445), (5, 10, 445), (3, 30, 645);
-create index t1v1 on t1(v1);
-create index t1v2 on t1(v2);
-select * from t1 where v1 = 1;
-select * from t1 where v2 = 40;
-select * from t1 where v1 = 1 or v1 = 2;
-select * from t1 where v1 = 1 and v2 = 50;
-select * from t1 where v3 = 721;
-insert into t1 values (6, 0, 721), (7, -10, 645);
-select * from t1 where v1 = 6;
-select * from t1 where v2 = -10;
-update t1 set v3 = 645, v1 = 8, v2 = -20 where v1 = 2;
-select * from t1 where v1 = 7 or 3 = v1;
+create table t1(v1 int, v2 int, v3 int, v4 int, v5 int, v6 varchar(128));
+select v5, min(v1), sum(v2), count(*) from t1 group by v5;
+
+select count(*) from t1;
+----
+0
+
+select min(v1) from t1;
+----
+integer_null
+
+../test/sql/p3.09-group-agg-2.slt  --verbose
+
+../test/sql/p3.08-group-agg-1.slt  --verbose 
+
+../test/sql/p3.07-simple-agg.slt  --verbose
+
+../test/sql/p3.06-empty-table.slt --verbose  

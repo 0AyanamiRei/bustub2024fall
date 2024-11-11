@@ -1,5 +1,5 @@
 #include <vector>
-
+#include <unordered_map>
 #include "optimizer/optimizer.h"
 #include "execution/plans/seq_scan_plan.h"
 #include "execution/plans/index_scan_plan.h"
@@ -19,11 +19,15 @@ using std::cout, std::endl;
 void Show_child(const AbstractExpressionRef &expr, std::vector<uint32_t> &col_id,
                 std::vector<AbstractExpressionRef> &pred_keys) {
   if(!(expr->children_[0]->children_.size() + expr->children_[1]->children_.size())) {
-    auto colV = dynamic_cast<const ColumnValueExpression *>(expr->GetChildAt(0).get()); // ColumnValueExpression
-    // auto conV = dynamic_cast<const ConstantValueExpression *>(expr->GetChildAt(1).get()); // maybe ConstantValueExpression
+    int colunm = 0, constant = 1;
+    if(expr->GetChildAt(colunm)->GetReturnType().GetName() == "<val>") {
+      colunm = 1, constant = 0;
+    }
+    auto colV = dynamic_cast<const ColumnValueExpression *>(expr->GetChildAt(colunm).get()); // ColumnValueExpression
+    // auto conV = dynamic_cast<const ConstantValueExpression *>(expr->GetChildAt(constant).get()); // maybe ConstantValueExpression
     col_id.push_back(colV->GetColIdx());
     /**< TODO 目前暂时不会处理v1 = v2 这种情况, 只处理了v1 = 1 */
-    pred_keys.push_back(expr->GetChildAt(1));
+    pred_keys.push_back(expr->GetChildAt(constant));
     return;
   }
   for(std::vector<AbstractExpressionRef>::size_type i = 0; i < expr->children_.size(); i++) {
@@ -76,8 +80,33 @@ auto Optimizer::OptimizeSeqScanAsIndexScan(const bustub::AbstractPlanNodeRef &pl
         return optimized_plan;
       }
     }
+
+    /**< 去重pred_keys */
+    // 暂时性假设全部为ConstantValueExpression类
+    std::vector<Value> seen_values;
+    auto it = pred_keys.begin();
+    while (it != pred_keys.end()) {
+        auto conV = dynamic_cast<ConstantValueExpression*>(it->get());
+        bool found = false;
+        for (auto &v : seen_values) {
+            if (conV->val_.CompareEquals(v) == bustub::CmpBool::CmpTrue) {
+                found = true;
+                break;
+            }
+        }
+        if (found) {
+            it = pred_keys.erase(it);
+        } else {
+            seen_values.push_back(conV->val_);
+            ++it;
+        }
+    }
+
+    for(int i = 0; i + 1< static_cast<int>(pred_keys.size()); i ++) {
+      col_id.pop_back();
+    }
     return std::make_shared<IndexScanPlanNode>(seqscan_plan.output_schema_, seqscan_plan.table_oid_, 
-                                               index_oid, seqscan_plan.filter_predicate_, pred_keys);
+                           index_oid, seqscan_plan.filter_predicate_, pred_keys);
   }
 
   return plan;

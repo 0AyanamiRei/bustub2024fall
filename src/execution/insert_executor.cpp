@@ -40,7 +40,6 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     /**< 修改相关Index */
     for(auto &index_info_ : index_info_vec_) {
       auto &index_ = index_info_->index_;
-      // std::cout << index_->GetMetadata()->ToString() << std::endl;
       index_->InsertEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
                           tuple->GetRid(), exec_ctx_->GetTransaction());
     }

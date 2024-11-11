@@ -28,10 +28,16 @@ void DeleteExecutor::Init() {}
 auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   int32_t cnt = 0;
   auto table_info_ = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_);
-  // auto index_info_vec_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
+  auto index_info_vec_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
 
   while(child_executor_->Next(tuple, rid)) {
     table_info_->table_->UpdateTupleMeta({0, true}, *rid);
+    /**< 修改相关Index */
+    for(auto &index_info_ : index_info_vec_) {
+      auto &index_ = index_info_->index_;
+      index_->DeleteEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
+                          tuple->GetRid(), exec_ctx_->GetTransaction());
+    }
     cnt++;
   }
   *tuple = Tuple({{TypeId::INTEGER, cnt}}, &GetOutputSchema()); /**< 返回删除rows的数量 */
