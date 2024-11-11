@@ -73,3 +73,54 @@ notes
 
 1. 3.4中的**Serialization Certifier**和**serial safety net**
 2. 5中提到内存式的DBMS可以通过粗粒度**coarse-grained**的基于epoch**epoch-based**的内存管理来追踪被事务创建的版本
+
+
+## benchmark
+
+探究验证用的负载集: **YCSB**
+
+1. read-only
+2. read80%, write20%
+3. read20%, write80%
+
+数据的竞争程度通过服从**Zipfian**分布访问tuple来控制, 参数skew表示数据访问的倾斜程度, skew越大表示少量元素被访问的频率越高.
+
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/7251387/72624553-7795f900-3947-11ea-8cf2-d53d00cf5196.png">
+</p>
+
+模拟现实场景测试的负载集: **TPC-C**, 测量OLTP系统性能的标准负载
+
+### 并发控制协议的测试
+
+实验的方向分为:
+
+1. 扩展性瓶颈 (Scalability Bottlenecks)
+2. 事务争用 (Transaction Contention)
+3. 异构负载 (Heterogeneous Workload)
+
+扩展性方面的测试配置为YCSB-read-olny, 较低的倾斜程度, 混合事务长度(单事务包含操作数), 扩展线程数量来观察吞吐量变化.
+
+<p align="center">
+  <img src="https://blog.mrcroxx.com/posts/paper-reading/wu-vldb2017/figure-6.png">
+</p>
+
+事务争用或者说数据竞争方面的测试配置为固定40线程, YCSB-read80%-write20%, YCSB-read20%-write80%, 调整数据访问倾斜程度来观察吞吐量变化.
+
+<p align="center">
+  <img src="https://blog.mrcroxx.com/posts/paper-reading/wu-vldb2017/figure-7.png">
+</p>
+
+
+异构负载, 上面执行的测试所有的事务所含读写操作都相同, 该处的异构负载由**读写和只读的SERIALIZABLE事务**混合而成, 实验配置是固定20个线程执行读写事务, 0.8的数据访问倾斜程度, 每个事务100个操作, 每个操作访问不同的tuple, 分别测试带声明"只读"和不带声明的两种情况.
+
+采取高倾斜程度猜测是为了降低线程数量对吞吐量的影响.
+
+<p align="center">
+  <img src="https://blog.mrcroxx.com/posts/paper-reading/wu-vldb2017/figure-8.png">
+</p>
+
+
+<p align="center">
+  <img src="https://blog.mrcroxx.com/posts/paper-reading/wu-vldb2017/figure-9.png">
+</p>
