@@ -44,6 +44,7 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     *tuple = Tuple{values, &child_executor_->GetOutputSchema()};
     /**< 插入tuple */
     tuple->SetRid(table_info_->table_->InsertTuple({0, false}, *tuple, nullptr, nullptr, plan_->table_oid_).value());
+    /**< 更新index */
     for(auto &index_info_ : index_info_vec_) {
       auto &index_ = index_info_->index_;
       // std::cout << index_->GetMetadata()->ToString() << std::endl;

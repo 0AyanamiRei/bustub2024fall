@@ -16,3 +16,8 @@ integer_null
 ../test/sql/p3.07-simple-agg.slt  --verbose
 
 ../test/sql/p3.06-empty-table.slt --verbose  
+
+
+create table t1(v1 int, v2 int);
+insert into t1 values(1, 2);
+ 

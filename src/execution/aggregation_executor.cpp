@@ -34,6 +34,13 @@ AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const Aggreg
   aht_iterator_ = {aht_.Begin()};
 }
 
+/**
+ * (TODO)
+ * 如果将构造函数中的内容放在Init执行, 对agg2的其中一个测试无法通过:
+ * Agg { types=[], aggregates=[], group_by=["#0.0", "#0.1", "#0.2", "#0.3"] }
+ *     Agg { types=["sum", "sum", "sum"], aggregates=["#0.1", "#0.2", "#0.0"], group_by=["#0.3"] }
+ * 第一个Agg调用child_executor_->Next(..)后, 第二个Agg执行的时候会出问题
+*/
 void AggregationExecutor::Init() {}
 
 auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool {

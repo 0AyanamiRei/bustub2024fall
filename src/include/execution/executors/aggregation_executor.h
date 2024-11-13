@@ -73,8 +73,6 @@ class SimpleAggregationHashTable {
   }
 
   /**
-   * TODO(Student)
-   *
    * Combines the input into the aggregation result.
    * @param[out] result The output aggregate value
    * @param input The input value
