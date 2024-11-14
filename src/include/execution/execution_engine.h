@@ -96,6 +96,7 @@ class ExecutionEngine {
                            std::vector<Tuple> *result_set) {
     RID rid{};
     Tuple tuple{};
+    // (TODO) 允许一次性吐出多组Tuple&RID
     while (executor->Next(&tuple, &rid)) {
       if (result_set != nullptr) {
         result_set->push_back(tuple);

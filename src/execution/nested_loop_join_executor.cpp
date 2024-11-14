@@ -32,6 +32,13 @@ NestedLoopJoinExecutor::NestedLoopJoinExecutor(ExecutorContext *exec_ctx, const 
 void NestedLoopJoinExecutor::Init() {}
 
 auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
+
+  if(!tuples_.empty()) {
+    *tuple = tuples_.back();
+    tuples_.pop_back();
+    return true;
+  }
+
   Tuple r_tuple{};
   Tuple l_tuple{};
   RID r_rid{};
@@ -41,54 +48,61 @@ auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 
   while(left_executor_->Next(&l_tuple, &l_rid)) {
     Value value;
-    for(right_executor_->Init(); right_executor_->Next(&r_tuple, &r_rid); ) {
-      value = plan_->predicate_->EvaluateJoin(&l_tuple, l_Schema, &r_tuple, r_Schema);
-      if (value.IsNull() || !value.GetAs<bool>()) {
-        continue;
-      } else {
-        break;
-      }
-    }
-
-    if (plan_->GetJoinType() == JoinType::INNER && (value.IsNull() || !value.GetAs<bool>())) {
-      continue;
-    }
-
     std::vector<Value> values{};
     uint32_t l_colms = l_Schema.GetColumnCount();
     uint32_t r_colms = r_Schema.GetColumnCount();
     values.reserve(l_colms + r_colms);
-
-    for(uint32_t i = 0; i < l_colms; i ++) {
-      values.push_back(l_tuple.GetValue(&l_Schema, i));
-    }
-
-    if(!value.IsNull() && value.GetAs<bool>()) {
-      for(uint32_t i = 0; i < r_colms; i ++) {
-        values.push_back(r_tuple.GetValue(&r_Schema, i));
-      }
-    } else {
-      switch (plan_->GetJoinType()) {
-      case JoinType::LEFT: /**< 右节点全部加入NULL */
-        for(uint32_t i = 0; i < r_colms; i ++) {
-          values.emplace_back(ValueFactory::GetNullValueByType(r_Schema.GetColumn(i).GetType()));
+    for(right_executor_->Init(); right_executor_->Next(&r_tuple, &r_rid); ) {
+      value = plan_->predicate_->EvaluateJoin(&l_tuple, l_Schema, &r_tuple, r_Schema);
+      if (!value.IsNull() && value.GetAs<bool>()) {
+        values.clear();
+        for(uint32_t i = 0; i < l_colms; i ++) {
+          values.push_back(l_tuple.GetValue(&l_Schema, i));
         }
-        break;
-      case JoinType::RIGHT:
-        throw bustub::NotImplementedException(fmt::format("join type {} not supported", plan_->GetJoinType()));
-      case JoinType::OUTER:
-        throw bustub::NotImplementedException(fmt::format("join type {} not supported", plan_->GetJoinType()));
-      case JoinType::INNER:
-        throw bustub::ExecutionException(fmt::format("join type {} shoud not be here", plan_->GetJoinType()));
-      case JoinType::INVALID:
-        throw bustub::ExecutionException(fmt::format("join type {} shoud not be here", plan_->GetJoinType()));
+        for(uint32_t i = 0; i < r_colms; i ++) {
+          values.push_back(r_tuple.GetValue(&r_Schema, i));
+        }
+        tuples_.emplace_back(Tuple{values, &GetOutputSchema()});
       }
     }
-
-    *tuple = Tuple(values, &GetOutputSchema());
-    return true;
+  
+    if(!tuples_.empty()) {
+      *tuple = tuples_.back();
+      tuples_.pop_back();
+      return true;
+    } else {
+        switch (plan_->GetJoinType()) {
+        case JoinType::LEFT: /**< 右节点全部加入NULL */
+        {
+          values.clear();
+          for(uint32_t i = 0; i < l_colms; i ++) {
+            values.push_back(l_tuple.GetValue(&l_Schema, i));
+          }
+          for(uint32_t i = 0; i < r_colms; i ++) {
+            values.emplace_back(ValueFactory::GetNullValueByType(r_Schema.GetColumn(i).GetType()));
+          }
+          *tuple = Tuple{values, &GetOutputSchema()};
+          return true;
+        }
+        case JoinType::RIGHT:
+          throw bustub::NotImplementedException(fmt::format("join type {} not supported", plan_->GetJoinType()));
+        case JoinType::OUTER:
+          throw bustub::NotImplementedException(fmt::format("join type {} not supported", plan_->GetJoinType()));
+        case JoinType::INNER:
+          continue;
+        case JoinType::INVALID:
+          throw bustub::ExecutionException(fmt::format("join type {} shoud not be here", plan_->GetJoinType()));
+        }
+      }
   }
-  return false;
+
+  if(!tuples_.empty()) {
+    *tuple = tuples_.back();
+    tuples_.pop_back();
+    return true;
+  } else {
+    return false;
+  }
 }
 
 }  // namespace bustub

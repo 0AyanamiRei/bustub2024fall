@@ -61,7 +61,6 @@ auto NestIndexJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
         return true;
       }
     } else {
-
       switch (plan_->GetJoinType()) {
       case JoinType::LEFT: /**< 右节点全部加入NULL */
         values.clear();
