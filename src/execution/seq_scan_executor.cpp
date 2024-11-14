@@ -17,30 +17,32 @@ namespace bustub {
 SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan)
     : AbstractExecutor{exec_ctx},
       plan_{plan},
-      iter_(exec_ctx->GetCatalog()->GetTable(plan->table_oid_)->table_->MakeIterator()) {}
+      iter_(std::make_unique<TableIterator>(exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->table_->MakeIterator())) {}
 
-void SeqScanExecutor::Init() {}
+void SeqScanExecutor::Init() {
+  iter_ = std::make_unique<TableIterator>(exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->table_->MakeIterator());
+}
 
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
-  while(!iter_.IsEnd()) {
-    auto [meta, data] = iter_.GetTuple();
+  while(!iter_->IsEnd()) {
+    auto [meta, data] = iter_->GetTuple();
     /**< 跳过 */
     if(meta.is_deleted_) {
-      ++iter_;
+      ++(*iter_.get());
       continue;
     }
     *tuple = data;
-    *rid = iter_.GetRID();
+    *rid = iter_->GetRID();
     /**< 应用谓词 */
     if(plan_->filter_predicate_) {
       auto value = plan_->filter_predicate_->Evaluate(tuple, GetOutputSchema());
       if (value.IsNull() || !value.GetAs<bool>()) {
-        ++iter_;
+        ++(*iter_.get());
         continue;
       }
     }
     /**< 返回 */
-    ++iter_;
+    ++(*iter_.get());
     return true;
   }
   return false;

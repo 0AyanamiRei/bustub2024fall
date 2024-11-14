@@ -9,15 +9,122 @@ select min(v1) from t1;
 ----
 integer_null
 
-../test/sql/p3.09-group-agg-2.slt  --verbose
 
-../test/sql/p3.08-group-agg-1.slt  --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.10-simple-join.slt  --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.09-group-agg-2.slt  --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.08-group-agg-1.slt  --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.07-simple-agg.slt  --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.06-empty-table.slt --verbose  
 
-../test/sql/p3.07-simple-agg.slt  --verbose
+set force_optimizer_starter_rule=yes;
+CREATE TABLE t1(v1 int, v2 int);
+CREATE TABLE t2(v3 int, v4 int);
+insert into t1 values (1, 101), (2, 102), (3, 103);
+insert into t2 values (1, 201), (2, 202), (3, 203);
+CREATE INDEX t2v3 on t2(v3);
+EXPLAIN (o) SELECT * FROM t1 INNER JOIN t2 ON v1 = v3;
 
-../test/sql/p3.06-empty-table.slt --verbose  
-
-
-create table t1(v1 int, v2 int);
-insert into t1 values(1, 2);
- 
+set force_optimizer_starter_rule=yes;
+create table temp_2(colA int, colB int, colC int);
+insert into temp_2 values
+    (0, 142, 0),
+    (1, 993, 1),
+    (2, 837, 2),
+    (3, 380, 3),
+    (4, 240, 4),
+    (5, 290, 5),
+    (6, 592, 6),
+    (7, 88 , 7),
+    (8, 194, 8),
+    (9, 638, 9),
+    (10, 290, 0),
+    (11, 878, 1),
+    (12, 170, 2),
+    (13, 332, 3),
+    (14, 680, 4),
+    (15, 2, 5),
+    (16, 552, 6),
+    (17, 561, 7),
+    (18, 398, 8),
+    (19, 974, 9),
+    (20, 739, 0),
+    (21, 352, 1),
+    (22, 387, 2),
+    (23, 598, 3),
+    (24, 440, 4),
+    (25, 83, 5),
+    (26, 57, 6),
+    (27, 883, 7),
+    (28, 914, 8),
+    (29, 538, 9),
+    (30, 132, 0),
+    (31, 723, 1),
+    (32, 666, 2),
+    (33, 701, 3),
+    (34, 311, 4),
+    (35, 214, 5),
+    (36, 259, 6),
+    (37, 812, 7),
+    (38, 194, 8),
+    (39, 160, 9),
+    (40, 917, 0),
+    (41, 949, 1),
+    (42, 42 , 2),
+    (43, 272, 3),
+    (44, 975, 4),
+    (45, 518, 5),
+    (46, 930, 6),
+    (47, 399, 7),
+    (48, 924, 8),
+    (49, 731, 9),
+    (50, 8  , 0),
+    (51, 219, 1),
+    (52, 276, 2),
+    (53, 770, 3),
+    (54, 991, 4),
+    (55, 390, 5),
+    (56, 419, 6),
+    (57, 346, 7),
+    (58, 898, 8),
+    (59, 396, 9),
+    (60, 221, 0),
+    (61, 208, 1),
+    (62, 934, 2),
+    (63, 510, 3),
+    (64, 147, 4),
+    (65, 156, 5),
+    (66, 529, 6),
+    (67, 86 , 7),
+    (68, 384, 8),
+    (69, 603, 9),
+    (70, 107, 0),
+    (71, 867, 1),
+    (72, 253, 2),
+    (73, 782, 3),
+    (74, 124, 4),
+    (75, 879, 5),
+    (76, 34 , 6),
+    (77, 143, 7),
+    (78, 494, 8),
+    (79, 125, 9),
+    (80, 400, 0),
+    (81, 187, 1),
+    (82, 982, 2),
+    (83, 641, 3),
+    (84, 711, 4),
+    (85, 779, 5),
+    (86, 648, 6),
+    (87, 590, 7),
+    (88, 241, 8),
+    (89, 929, 9),
+    (90, 914, 0),
+    (91, 449, 1),
+    (92, 815, 2),
+    (93, 225, 3),
+    (94, 377, 4),
+    (95, 120, 5),
+    (96, 662, 6),
+    (97, 277, 7),
+    (98, 351, 8),
+    (99, 722, 9);
+select * from temp_2 t2 inner join test_simple_seq_2 s2 on t2.colB < s2.col2;
