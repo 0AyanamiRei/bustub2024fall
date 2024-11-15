@@ -10,11 +10,23 @@ select min(v1) from t1;
 integer_null
 
 
+
+./bin/bustub-sqllogictest ../test/sql/p3.13-nested-index-join.slt  --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.12-repeat-execute.slt  --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.11-multi-way-join.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.10-simple-join.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.09-group-agg-2.slt  --verbose
 ./bin/bustub-sqllogictest ../test/sql/p3.08-group-agg-1.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.07-simple-agg.slt  --verbose
 ./bin/bustub-sqllogictest ../test/sql/p3.06-empty-table.slt --verbose  
+./bin/bustub-sqllogictest ../test/sql/p3.05-index-scan.slt --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.04-delete.slt --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.03-update.slt --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.02-insert.slt --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.01-seqscan.slt --verbose 
+
+
+
 
 create table temp_2(colA int, colB int, colC int);
 create table temp_1(colA int, colB int, colC int, colD int);

@@ -41,7 +41,10 @@ AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const Aggreg
  *     Agg { types=["sum", "sum", "sum"], aggregates=["#0.1", "#0.2", "#0.0"], group_by=["#0.3"] }
  * 第一个Agg调用child_executor_->Next(..)后, 第二个Agg执行的时候会出问题
 */
-void AggregationExecutor::Init() {}
+void AggregationExecutor::Init() {
+  aht_iterator_ = {aht_.Begin()};
+  first_ = true;
+}
 
 auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   std::vector<Value> values;
