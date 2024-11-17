@@ -35,10 +35,7 @@ void NestedLoopJoinExecutor::Init() {
 }
 
 auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
-
-  if(!tuples_.empty()) {
-    *tuple = tuples_.back();
-    tuples_.pop_back();
+  if(TryNext(tuple, rid)) {
     return true;
   }
 
@@ -51,14 +48,13 @@ auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 
   while(left_executor_->Next(&l_tuple, &l_rid)) {
     Value value;
-    std::vector<Value> values{};
     uint32_t l_colms = l_Schema.GetColumnCount();
     uint32_t r_colms = r_Schema.GetColumnCount();
-    values.reserve(l_colms + r_colms);
     for(right_executor_->Init(); right_executor_->Next(&r_tuple, &r_rid); ) {
       value = plan_->predicate_->EvaluateJoin(&l_tuple, l_Schema, &r_tuple, r_Schema);
       if (!value.IsNull() && value.GetAs<bool>()) {
-        values.clear();
+        std::vector<Value> values{};
+        values.reserve(l_colms + r_colms);
         for(uint32_t i = 0; i < l_colms; i ++) {
           values.push_back(l_tuple.GetValue(&l_Schema, i));
         }
@@ -68,16 +64,15 @@ auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
         tuples_.emplace_back(Tuple{values, &GetOutputSchema()});
       }
     }
-  
-    if(!tuples_.empty()) {
-      *tuple = tuples_.back();
-      tuples_.pop_back();
+
+    if(TryNext(tuple, rid)) {
       return true;
     } else {
         switch (plan_->GetJoinType()) {
         case JoinType::LEFT: /**< 右节点全部加入NULL */
         {
-          values.clear();
+          std::vector<Value> values{};
+          values.reserve(l_colms + r_colms);
           for(uint32_t i = 0; i < l_colms; i ++) {
             values.push_back(l_tuple.GetValue(&l_Schema, i));
           }
@@ -99,13 +94,16 @@ auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
       }
   }
 
+  return TryNext(tuple, rid);
+}
+
+auto inline NestedLoopJoinExecutor::TryNext(Tuple *tuple, RID *rid) -> bool{
   if(!tuples_.empty()) {
     *tuple = tuples_.back();
     tuples_.pop_back();
     return true;
-  } else {
-    return false;
   }
+  return false;
 }
 
 }  // namespace bustub

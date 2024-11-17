@@ -1,37 +1,75 @@
 #include <iostream>
-#include <vector>
-
-#define DISALLOW_COPY(cname)                                    \
-  cname(const cname &) = delete;                   /* NOLINT */ \
-  auto operator=(const cname &)->cname & = delete; /* NOLINT */
-
-#define DISALLOW_MOVE(cname)                               \
-  cname(cname &&) = delete;                   /* NOLINT */ \
-  auto operator=(cname &&)->cname & = delete; /* NOLINT */
-
-#define DISALLOW_COPY_AND_MOVE(cname) \
-  DISALLOW_COPY(cname);               \
-  DISALLOW_MOVE(cname);
+#include <cstring>
 
 using namespace std;
 
-class TableIterator {
- public:
-  DISALLOW_COPY(TableIterator);
-  TableIterator(int id) : id_(id) {}
-  TableIterator(TableIterator &&) = default;
-  ~TableIterator() = default;
- private:
-  int id_;
-};
+bool flag = true;
+const char* input;
+int pos = 0;
 
-auto MakeIterator() -> TableIterator {
-  return {0};
+char getToken() {
+    return input[pos++];
+}
+
+void E();
+void T();
+void F();
+
+void E() {
+    T();
+    while (input[pos] == '+') {
+        getToken();
+        T();
+    }
+}
+
+void T() {
+    F();
+    while (input[pos] == '*') {
+        getToken();
+        F();
+    }
+}
+
+void F() {
+    if (input[pos] == '(') {
+        getToken();
+        E();
+        if (input[pos] == ')') {
+            getToken();
+        } else {
+            flag = false;
+        }
+    } else if (input[pos] == 'i') {
+        getToken();
+    } else {
+        flag = false;
+    }
+}
+
+bool fourArithmeticOperationsParse(const char parseStr[]) {
+    input = parseStr;
+    pos = 0;
+    flag = true;
+    E();
+    return flag && input[pos] == '\0';
 }
 
 int main() {
-  TableIterator t1(1), t2(2);
-  auto t_move = std::move(t1);
-  t_move = std::move(t2);
-  return 0;
+    const char* test1 = "i+i*(i+i)";
+    const char* test2 = "(i+i)*i+i+i*i";
+
+    if (fourArithmeticOperationsParse(test1)) {
+        cout << "Test 1 success!" << endl;
+    } else {
+        cout << "Test 1 error!" << endl;
+    }
+
+    if (fourArithmeticOperationsParse(test2)) {
+        cout << "Test 2 success!" << endl;
+    } else {
+        cout << "Test 2 error!" << endl;
+    }
+
+    return 0;
 }
