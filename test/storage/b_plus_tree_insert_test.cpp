@@ -23,7 +23,7 @@ namespace bustub {
 
 using bustub::DiskManagerUnlimitedMemory;
 
-TEST(BPlusTreeTests, DISABLED_InsertTest1) {
+TEST(BPlusTreeTests, DISABLED_BasicInsertTest) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -107,7 +107,7 @@ TEST(BPlusTreeTests, InsertTest3) {
   // allocate header_page
   page_id_t page_id = bpm->NewPage();
   // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", page_id, bpm, comparator);
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", page_id, bpm, comparator, 2, 3);
   GenericKey<8> index_key;
   RID rid;
 
@@ -132,12 +132,12 @@ TEST(BPlusTreeTests, InsertTest3) {
 
   int64_t start_key = 1;
   int64_t current_key = start_key;
-  index_key.SetFromInteger(start_key);
-  for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
-    auto location = (*iterator).second;
+  for (auto iter = tree.Begin(); iter != tree.End(); ++iter) {
+    auto pair = *iter;
+    auto location = pair.second;
     EXPECT_EQ(location.GetPageId(), 0);
     EXPECT_EQ(location.GetSlotNum(), current_key);
-    ++current_key;
+    current_key = current_key + 1;
   }
 
   EXPECT_EQ(current_key, keys.size() + 1);
@@ -145,11 +145,11 @@ TEST(BPlusTreeTests, InsertTest3) {
   start_key = 3;
   current_key = start_key;
   index_key.SetFromInteger(start_key);
-  for (auto iterator = tree.Begin(index_key); iterator != tree.End(); ++iterator) {
+  for (auto iterator = tree.Begin(index_key); !iterator.IsEnd(); ++iterator) {
     auto location = (*iterator).second;
     EXPECT_EQ(location.GetPageId(), 0);
     EXPECT_EQ(location.GetSlotNum(), current_key);
-    ++current_key;
+    current_key = current_key + 1;
   }
   delete bpm;
 }
