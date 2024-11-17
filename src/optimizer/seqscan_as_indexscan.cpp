@@ -10,11 +10,24 @@ namespace bustub {
 
 using std::cout, std::endl;
 
-/**< 如果是v1 = 1 or v1 = 2 or v1 = 3这种形式下一个谓词节点形式如下:
- *       Logic
- *     /      \
- *    colV   conV
- * 第一个根节点就代表v1, 第二个根节点就代表常数1, 2, 3
+/**< 假设有表:
+ * +-----+-----+-----+
+ * | v_0 | v_1 | v_2 |
+ * +-----+-----+-----+
+ * ((v1=a) or (v2<=b)) or (c=v0)
+ *          or
+ *      /       \
+ *     or       =
+ *    /   \    /  \
+ *   =     <= c   v0
+ *  / \   /  \
+ * v1  a v2   b
+ * 最终要得到的内容:
+ * col_id    = {    1,           2,           0}
+ * pred_keys = {{"=", 'a'}, {"<=", 'b'}, {"=", 'c'}}
+ * 
+ * 需要处理的case:
+ * 
 */
 void Show_child(const AbstractExpressionRef &expr, std::vector<uint32_t> &col_id,
                 std::vector<AbstractExpressionRef> &pred_keys) {
@@ -27,6 +40,7 @@ void Show_child(const AbstractExpressionRef &expr, std::vector<uint32_t> &col_id
     // auto conV = dynamic_cast<const ConstantValueExpression *>(expr->GetChildAt(constant).get()); // maybe ConstantValueExpression
     col_id.push_back(colV->GetColIdx());
     /**< TODO 目前暂时不会处理v1 = v2 这种情况, 只处理了v1 = 1 */
+    // std::cout << expr->GetChildAt(colunm)->ToString() << "==" << expr->GetChildAt(constant)->ToString() << std::endl;
     pred_keys.push_back(expr->GetChildAt(constant));
     return;
   }
@@ -35,81 +49,82 @@ void Show_child(const AbstractExpressionRef &expr, std::vector<uint32_t> &col_id
   }
 }
 
-auto Optimizer::OptimizeSeqScanAsIndexScan(const bustub::AbstractPlanNodeRef &plan) -> AbstractPlanNodeRef {
-  // TODO(student): implement seq scan with predicate -> index scan optimizer rule
-  // The Filter Predicate Pushdown has been enabled for you in optimizer.cpp when forcing starter rule
+auto Seq2Index(const bustub::AbstractPlanNodeRef &plan, const Catalog &catalog_) -> AbstractPlanNodeRef {
+  /**< 将SeqScan优化为IndexScan */
+  const auto &seqscan_plan = dynamic_cast<const SeqScanPlanNode &>(*plan);
+  auto index_vec_ = catalog_.GetTableIndexes(seqscan_plan.table_name_);
+  if(!index_vec_.size() || !seqscan_plan.filter_predicate_
+                        || !seqscan_plan.filter_predicate_->children_.size()) { /**< 没有索引和过滤 */
+    return plan;
+  }
+  std::vector<uint32_t> col_id;
+  std::vector<AbstractExpressionRef> pred_keys;
+  Show_child(seqscan_plan.filter_predicate_, col_id, pred_keys);
 
-  /**< 将当前节点的儿子移动到`children`中 */
+  /**< 目前索引的key可以假设只有一列 */
+  index_oid_t index_oid;
+  std::vector<std::shared_ptr<bustub::IndexInfo>>::size_type i;
+  for(i = 0; i < index_vec_.size(); i ++) { /**< 寻找索引的oid */
+    if (index_vec_[i]->index_->GetKeyAttrs()[0] == col_id[0]) {
+      index_oid = index_vec_[i]->index_oid_;
+      break;
+    }
+  }
+
+  if(i == index_vec_.size()) {
+    return plan;
+  }
+
+  for(std::vector<uint32_t>::size_type i = 0; i + 1 < col_id.size(); i ++) { /**< col_id中的值必须保持两两相同 */
+    if(col_id[i] != col_id[i + 1]) {
+      return plan;
+    }
+  }
+
+  /**< 去重pred_keys */
+  // 暂时性假设全部为ConstantValueExpression类
+  std::vector<Value> seen_values;
+  auto it = pred_keys.begin();
+  while (it != pred_keys.end()) {
+      auto conV = dynamic_cast<ConstantValueExpression*>(it->get());
+      bool found = false;
+      for (auto &v : seen_values) {
+          if (conV->val_.CompareEquals(v) == bustub::CmpBool::CmpTrue) {
+              found = true;
+              break;
+          }
+      }
+      if (found) {
+          it = pred_keys.erase(it);
+      } else {
+          seen_values.push_back(conV->val_);
+          ++it;
+      }
+  }
+
+  for(int i = 0; i + 1< static_cast<int>(pred_keys.size()); i ++) {
+    col_id.pop_back();
+  }
+
+  return std::make_shared<IndexScanPlanNode>(seqscan_plan.output_schema_, seqscan_plan.table_oid_, 
+                          index_oid, seqscan_plan.filter_predicate_, pred_keys);
+}
+
+
+auto Optimizer::OptimizeSeqScanAsIndexScan(const bustub::AbstractPlanNodeRef &plan) -> AbstractPlanNodeRef {
+  if(plan->GetType() == PlanType::SeqScan) {
+    return Seq2Index(plan, catalog_);
+  }
+  /**< (TODO) 通常来说一个节点的children只有1or2个? */
   std::vector<AbstractPlanNodeRef> children;
   for (const auto &child : plan->GetChildren()) {
-    children.emplace_back(OptimizeMergeFilterScan(child));
+    if(child->GetType() == PlanType::SeqScan) {
+      children.emplace_back(OptimizeMergeFilterScan(Seq2Index(child, catalog_)));
+    } else {
+      children.emplace_back(OptimizeMergeFilterScan(child));
+    }
   }
-  /**< 将被优化的算子节点 */
-  auto optimized_plan = plan->CloneWithChildren(std::move(children));
-
-  /**< 将SeqScan优化为IndexScan */
-  if (optimized_plan->GetType() == PlanType::SeqScan) {
-    const auto &seqscan_plan = dynamic_cast<const SeqScanPlanNode &>(*optimized_plan);
-    auto index_vec_ = catalog_.GetTableIndexes(seqscan_plan.table_name_);
-    if(!index_vec_.size()) { /**< 没有索引 */
-      return optimized_plan;
-    }
-    if(!seqscan_plan.filter_predicate_) { /**< 没有过滤 */
-      return optimized_plan;
-    }
-    std::vector<uint32_t> col_id;
-    std::vector<AbstractExpressionRef> pred_keys;
-    Show_child(seqscan_plan.filter_predicate_, col_id, pred_keys);
-
-    /**< 目前索引的key可以假设只有一列 */
-    index_oid_t index_oid;
-    std::vector<std::shared_ptr<bustub::IndexInfo>>::size_type i;
-    for(i = 0; i < index_vec_.size(); i ++) { /**< 寻找索引的oid */
-      if (index_vec_[i]->index_->GetKeyAttrs()[0] == col_id[0]) {
-        index_oid = index_vec_[i]->index_oid_;
-        break;
-      }
-    }
-
-    if(i == index_vec_.size()) {
-      return optimized_plan;
-    }
-
-    for(std::vector<uint32_t>::size_type i = 0; i + 1 < col_id.size(); i ++) { /**< col_id中的值必须保持两两相同 */
-      if(col_id[i] != col_id[i + 1]) {
-        return optimized_plan;
-      }
-    }
-
-    /**< 去重pred_keys */
-    // 暂时性假设全部为ConstantValueExpression类
-    std::vector<Value> seen_values;
-    auto it = pred_keys.begin();
-    while (it != pred_keys.end()) {
-        auto conV = dynamic_cast<ConstantValueExpression*>(it->get());
-        bool found = false;
-        for (auto &v : seen_values) {
-            if (conV->val_.CompareEquals(v) == bustub::CmpBool::CmpTrue) {
-                found = true;
-                break;
-            }
-        }
-        if (found) {
-            it = pred_keys.erase(it);
-        } else {
-            seen_values.push_back(conV->val_);
-            ++it;
-        }
-    }
-
-    for(int i = 0; i + 1< static_cast<int>(pred_keys.size()); i ++) {
-      col_id.pop_back();
-    }
-    return std::make_shared<IndexScanPlanNode>(seqscan_plan.output_schema_, seqscan_plan.table_oid_, 
-                           index_oid, seqscan_plan.filter_predicate_, pred_keys);
-  }
-
-  return plan;
+  return plan->CloneWithChildren(std::move(children));
 }
 
 /******************************************

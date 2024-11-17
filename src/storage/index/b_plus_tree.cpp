@@ -142,6 +142,9 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key) {
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
   page_id_t cursor_pid = GetRootPageId();
+  if(cursor_pid == -1) {
+    return {};
+  }
   ReadPageGuard cursor_guard = bpm_->ReadPage(cursor_pid);
   auto cursor_page = cursor_guard.As<BPlusTreePage>();
 
@@ -279,7 +282,6 @@ void BPLUSTREE_TYPE::FixUnderflowLeaf(Context &ctx, LeafPage *leaf_page, WritePa
     if (leaf_page->GetSize() == 0) { /** 删除root_page */
       auto head_page = ctx.header_page_.value().AsMut<BPlusTreeHeaderPage>();
       head_page->root_page_id_ = INVALID_PAGE_ID;
-      LOG_INFO("修改为空树");
     }
     return;
   }

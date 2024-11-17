@@ -33,16 +33,39 @@ class IndexScanExecutor : public AbstractExecutor {
    * @param exec_ctx the executor context
    * @param plan the index scan plan to be executed
    */
-  IndexScanExecutor(ExecutorContext *exec_ctx, const IndexScanPlanNode *plan);
+    IndexScanExecutor(ExecutorContext *exec_ctx, const IndexScanPlanNode *plan);
 
-  auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
+    auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 
-  void Init() override;
+    void Init() override;
 
-  auto Next(Tuple *tuple, RID *rid) -> bool override;
+    auto Next(Tuple *tuple, RID *rid) -> bool override;
 
- private:
-  /** The index scan plan node to be executed. */
-  const IndexScanPlanNode *plan_;
+    using Iterator = IndexIterator<IntegerKeyType, IntegerValueType, IntegerComparatorType>;
+    using BplusTreeIterator = BPlusTreeIndex<IntegerKeyType, IntegerValueType, IntegerComparatorType>;
+
+   private:
+    auto NextScan(Tuple *tuple, RID *rid) -> bool;
+    void InitIterator ();
+    /** The index scan plan node to be executed. */
+    const IndexScanPlanNode *plan_;
+    uint32_t pred_keys_at_;
+    Iterator iter_;
 };
 }  // namespace bustub
+
+
+/********************
+ * @bug 在不使用迭代器的时候请不要构造迭代器
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+**********************/

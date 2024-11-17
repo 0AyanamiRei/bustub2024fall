@@ -19,7 +19,20 @@ INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::~IndexIterator() = default;  // NOLINT
 
 INDEX_TEMPLATE_ARGUMENTS
+auto INDEXITERATOR_TYPE::operator=(INDEXITERATOR_TYPE &&other) noexcept -> INDEXITERATOR_TYPE& {
+  if (this != &other) {
+    leaf_guard_ = std::move(other.leaf_guard_);
+    idx_ = other.idx_;
+    bpm_ = other.bpm_;
+  }
+  return *this;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::IsEnd() -> bool {
+  if(bpm_ == nullptr) {
+    return true;
+  }
   auto leaf_page = leaf_guard_.As<B_PLUS_TREE_LEAF_PAGE_TYPE>();
   return leaf_page->GetNextPageId() == INVALID_PAGE_ID && idx_ >= leaf_page->GetSize() + 1;
 }

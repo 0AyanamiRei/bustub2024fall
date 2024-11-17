@@ -6,8 +6,24 @@
 ./bin/bustub-sqllogictest ../test/sql/p3.08-group-agg-1.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.07-simple-agg.slt  --verbose
 ./bin/bustub-sqllogictest ../test/sql/p3.06-empty-table.slt --verbose  
-./bin/bustub-sqllogictest ../test/sql/p3.05-index-scan.slt --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.05-index-scan-btree.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.04-delete.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.03-update.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.02-insert.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.01-seqscan.slt --verbose 
+
+
+set force_optimizer_starter_rule=yes;
+create table t1(v1 int, v2 varchar(128));
+insert into t1 values (0, '🥰'), (1, '🥰🥰');
+create index t1v1 on t1(v1);
+select * from __mock_table_123, (select * from t1 where v1 = 1);
+----
+1 1 🥰🥰
+2 1 🥰🥰
+3 1 🥰🥰
+
+=== OPTIMIZER ===
+NestedLoopJoin { type=Inner, predicate=true } | (__mock_table_123.number:INTEGER, __subquery#0.t1.v1:INTEGER, __subquery#0.t1.v2:VARCHAR(128))
+  MockScan { table=__mock_table_123 } | (__mock_table_123.number:INTEGER)
+  IndexScan { index_oid=0, filter=(#0.0=1) } | (__subquery#0.t1.v1:INTEGER, __subquery#0.t1.v2:VARCHAR(128))

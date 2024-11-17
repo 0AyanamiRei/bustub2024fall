@@ -3,73 +3,41 @@
 
 using namespace std;
 
-bool flag = true;
-const char* input;
-int pos = 0;
 
-char getToken() {
-    return input[pos++];
-}
+class IndexIterator {
+public:
+  IndexIterator(int _) {}
+  ~IndexIterator() = default;
+};
 
-void E();
-void T();
-void F();
+class BPlusTree {
+public:
+  auto Begin() -> IndexIterator {
+    return IndexIterator(1);
+  }
+};
 
-void E() {
-    T();
-    while (input[pos] == '+') {
-        getToken();
-        T();
-    }
-}
+class Index {
+public:
+    virtual ~Index() = default;
+};
 
-void T() {
-    F();
-    while (input[pos] == '*') {
-        getToken();
-        F();
-    }
-}
+class BPlusTreeIndex : public Index {
+public:
+  BPlusTreeIndex() {
+    container_ = BPlusTree();
+  }
+  auto GetIter() -> IndexIterator {
+    return container_.Begin();
+  }
+  BPlusTree container_;
+};
 
-void F() {
-    if (input[pos] == '(') {
-        getToken();
-        E();
-        if (input[pos] == ')') {
-            getToken();
-        } else {
-            flag = false;
-        }
-    } else if (input[pos] == 'i') {
-        getToken();
-    } else {
-        flag = false;
-    }
-}
 
-bool fourArithmeticOperationsParse(const char parseStr[]) {
-    input = parseStr;
-    pos = 0;
-    flag = true;
-    E();
-    return flag && input[pos] == '\0';
-}
 
 int main() {
-    const char* test1 = "i+i*(i+i)";
-    const char* test2 = "(i+i)*i+i+i*i";
+  Index index_ = BPlusTreeIndex();
 
-    if (fourArithmeticOperationsParse(test1)) {
-        cout << "Test 1 success!" << endl;
-    } else {
-        cout << "Test 1 error!" << endl;
-    }
-
-    if (fourArithmeticOperationsParse(test2)) {
-        cout << "Test 2 success!" << endl;
-    } else {
-        cout << "Test 2 error!" << endl;
-    }
-
-    return 0;
+  auto iter = static_cast<BPlusTreeIndex*>(&index_)->GetIter();
+  return 0;
 }

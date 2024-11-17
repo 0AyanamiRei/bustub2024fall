@@ -23,8 +23,11 @@ INDEX_TEMPLATE_ARGUMENTS
 class IndexIterator {
  public:
   // you may define your own constructor based on your member variables
+  IndexIterator() = default;
   IndexIterator(ReadPageGuard &&leaf_guard, int idx, BufferPoolManager *bpm);
   ~IndexIterator();  // NOLINT
+
+  auto operator=(IndexIterator &&other) noexcept -> IndexIterator &;
 
   auto IsEnd() -> bool;
 

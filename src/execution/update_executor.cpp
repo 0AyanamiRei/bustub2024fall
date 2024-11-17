@@ -35,6 +35,12 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   while(child_executor_->Next(tuple, rid)) {
     /**< 逻辑删除 (TODO) 考虑物理删除的时机 */
     table_info_->table_->UpdateTupleMeta({0, true}, *rid);
+    /**< 从index 中删除 */
+    for(auto &index_info_ : index_info_vec_) {
+      auto &index_ = index_info_->index_;
+      index_->DeleteEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
+                          tuple->GetRid(), exec_ctx_->GetTransaction());
+    }
     /**< 本地修改tuple */
     std::vector<Value> values{};
     values.reserve(child_executor_->GetOutputSchema().GetColumnCount());
@@ -47,7 +53,6 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     /**< 更新index */
     for(auto &index_info_ : index_info_vec_) {
       auto &index_ = index_info_->index_;
-      // std::cout << index_->GetMetadata()->ToString() << std::endl;
       index_->InsertEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
                           tuple->GetRid(), exec_ctx_->GetTransaction());
     }
