@@ -41,16 +41,14 @@ auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 
   Tuple r_tuple{};
   Tuple l_tuple{};
-  RID r_rid{};
-  RID l_rid{};
   auto &l_Schema = left_executor_->GetOutputSchema();
   auto &r_Schema = right_executor_->GetOutputSchema();
 
-  while(left_executor_->Next(&l_tuple, &l_rid)) {
+  while(left_executor_->Next(&l_tuple, rid)) {
     Value value;
     uint32_t l_colms = l_Schema.GetColumnCount();
     uint32_t r_colms = r_Schema.GetColumnCount();
-    for(right_executor_->Init(); right_executor_->Next(&r_tuple, &r_rid); ) {
+    for(right_executor_->Init(); right_executor_->Next(&r_tuple, rid); ) {
       value = plan_->predicate_->EvaluateJoin(&l_tuple, l_Schema, &r_tuple, r_Schema);
       if (!value.IsNull() && value.GetAs<bool>()) {
         std::vector<Value> values{};

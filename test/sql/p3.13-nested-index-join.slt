@@ -296,6 +296,11 @@ select * from test_simple_seq_2 t2 left join t1 on t1.v1 = t2.col1;
 8 18 integer_null
 9 19 integer_null
 
+statement ok
+explain (o,p) select * from
+    temp_2 t2 inner join
+    (select distinct(temp_2.colA) from temp_1 inner join temp_2 on temp_1.colC = temp_2.colA) t3
+    on t2.colB  < t3.colA;
 
 # Repeat
 query rowsort +ensure:index_join

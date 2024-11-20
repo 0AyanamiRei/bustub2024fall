@@ -15,12 +15,42 @@
 #include <memory>
 #include <utility>
 
+#include "common/util/hash_util.h"
+#include "container/hash/hash_function.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/hash_join_plan.h"
 #include "storage/table/tuple.h"
 
+#include "type/value_factory.h"
+
 namespace bustub {
+
+/** `std::vector<Value>`的包装类, 作为HashJoin的键值 */
+struct JoinKey {
+  std::vector<Value> keys_;
+
+  auto operator==(const JoinKey &other) const -> bool {
+    for (uint32_t i = 0; i < other.keys_.size(); i++) {
+      if (keys_[i].CompareEquals(other.keys_[i]) != CmpBool::CmpTrue) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
+struct JoinKeyHash {
+  auto operator()(const bustub::JoinKey &agg_key) const -> std::size_t {
+    size_t curr_hash = 0;
+    for (const auto &key : agg_key.keys_) {
+      if (!key.IsNull()) {
+        curr_hash = bustub::HashUtil::CombineHashes(curr_hash, bustub::HashUtil::HashValue(&key));
+      }
+    }
+    return curr_hash;
+  }
+};
 
 /**
  * HashJoinExecutor executes a nested-loop JOIN on two tables.
@@ -52,8 +82,16 @@ class HashJoinExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); };
 
  private:
+  /**< Help functions */
+  auto GetLeftJoinKey (const Tuple *tuple) -> JoinKey;
+  auto GetRightJoinKey (const Tuple *tuple) -> JoinKey;
+
   /** The HashJoin plan node to be executed. */
   const HashJoinPlanNode *plan_;
+  std::unique_ptr<AbstractExecutor> left_child_;
+  std::unique_ptr<AbstractExecutor> right_child_;
+  std::unordered_map<JoinKey, std::vector<Tuple>, JoinKeyHash> ht_;
+  std::vector<Tuple> tuples_;
 };
 
 }  // namespace bustub

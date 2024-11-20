@@ -119,9 +119,9 @@ auto Optimizer::OptimizeSeqScanAsIndexScan(const bustub::AbstractPlanNodeRef &pl
   std::vector<AbstractPlanNodeRef> children;
   for (const auto &child : plan->GetChildren()) {
     if(child->GetType() == PlanType::SeqScan) {
-      children.emplace_back(OptimizeMergeFilterScan(Seq2Index(child, catalog_)));
+      children.emplace_back(Seq2Index(child, catalog_));
     } else {
-      children.emplace_back(OptimizeMergeFilterScan(child));
+      children.emplace_back(child);
     }
   }
   return plan->CloneWithChildren(std::move(children));

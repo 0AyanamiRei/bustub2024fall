@@ -1,3 +1,7 @@
+./bin/bustub-sqllogictest ../test/sql/p3.15-multi-way-hash-join.slt  --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.14-hash-join.slt  --verbose
+
+
 ./bin/bustub-sqllogictest ../test/sql/p3.13-nested-index-join.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.12-repeat-execute.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.11-multi-way-join.slt  --verbose 
@@ -13,17 +17,10 @@
 ./bin/bustub-sqllogictest ../test/sql/p3.01-seqscan.slt --verbose 
 
 
-set force_optimizer_starter_rule=yes;
-create table t1(v1 int, v2 varchar(128));
-insert into t1 values (0, '🥰'), (1, '🥰🥰');
-create index t1v1 on t1(v1);
-select * from __mock_table_123, (select * from t1 where v1 = 1);
-----
-1 1 🥰🥰
-2 1 🥰🥰
-3 1 🥰🥰
+create table t1(v1 int);
+insert into t1 (select * from __mock_table_123);
+explain (o)
+select * from test_simple_seq_2 t2 left join t1 on t1.v1 = t2.col1;
 
-=== OPTIMIZER ===
-NestedLoopJoin { type=Inner, predicate=true } | (__mock_table_123.number:INTEGER, __subquery#0.t1.v1:INTEGER, __subquery#0.t1.v2:VARCHAR(128))
-  MockScan { table=__mock_table_123 } | (__mock_table_123.number:INTEGER)
-  IndexScan { index_oid=0, filter=(#0.0=1) } | (__subquery#0.t1.v1:INTEGER, __subquery#0.t1.v2:VARCHAR(128))
+select * from test_simple_seq_2;
+select * from t1;
