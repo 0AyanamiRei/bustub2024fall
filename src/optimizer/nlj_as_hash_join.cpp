@@ -20,46 +20,60 @@ namespace bustub {
 
 using std::cout, std::endl;
 
-void Read_predicate(const AbstractExpressionRef &expr,
+void parser_expr_4_hash_join (const AbstractExpressionRef &expr,
             std::vector<std::vector<AbstractExpressionRef>> &key_exprs, bool &fail) {
   if(fail) {
     return;
   }
-  if (const auto *expr_cmpr = dynamic_cast<const ComparisonExpression *>(expr.get());
-      expr_cmpr != nullptr) {
-    if (expr_cmpr->comp_type_ == ComparisonType::Equal) {
-      BUSTUB_ENSURE(expr_cmpr->children_.size() == 2, "ComparisonExpression should have exactly 2 children.");
-      if (const auto *left_expr = dynamic_cast<const ColumnValueExpression *>(expr_cmpr->children_[0].get()); 
-          left_expr != nullptr) {
-        if (const auto *right_expr = dynamic_cast<const ColumnValueExpression *>(expr_cmpr->children_[1].get());
-            right_expr != nullptr) {
-          // Now it's in form of <column_expr> = <column_expr>.
-          key_exprs[left_expr->GetTupleIdx()].emplace_back(std::make_shared<ColumnValueExpression>
-                                                          (0, left_expr->GetColIdx(), left_expr->GetReturnType()));
-          key_exprs[right_expr->GetTupleIdx()].emplace_back(std::make_shared<ColumnValueExpression>
-                                                          (0, right_expr->GetColIdx(), right_expr->GetReturnType()));
-          return;
-        }     
+  if (const auto *expr_cmpr = dynamic_cast<const ComparisonExpression *>(expr.get()); expr_cmpr != nullptr) {
+    switch (expr_cmpr->comp_type_)
+    {
+      case ComparisonType::Equal:
+      {
+        BUSTUB_ENSURE(expr_cmpr->children_.size() == 2, "ComparisonExpression should have exactly 2 children.");
+        if (const auto *left_expr = dynamic_cast<const ColumnValueExpression *>(expr_cmpr->children_[0].get()); 
+            left_expr != nullptr) {
+          if (const auto *right_expr = dynamic_cast<const ColumnValueExpression *>(expr_cmpr->children_[1].get());
+              right_expr != nullptr) {
+            // Now it's in form of <column_expr> = <column_expr>
+            key_exprs[left_expr->GetTupleIdx()].emplace_back(std::make_shared<ColumnValueExpression>
+                                                            (0, left_expr->GetColIdx(), left_expr->GetReturnType()));
+            key_exprs[right_expr->GetTupleIdx()].emplace_back(std::make_shared<ColumnValueExpression>
+                                                            (0, right_expr->GetColIdx(), right_expr->GetReturnType()));
+            return;
+          }     
+        }
+        fail = true;
+        return;
       }
+      case ComparisonType::GreaterThan:
+      case ComparisonType::GreaterThanOrEqual:
+      case ComparisonType::LessThan:
+      case ComparisonType::LessThanOrEqual:
+      case ComparisonType::NotEqual:
+      default:
+      {
+        fail = true;
+        return;
+      }
+    }
+    if (expr_cmpr->comp_type_ == ComparisonType::Equal) {
     }
     // it's not the form of <column_expr> = <column_expr>.
     fail = true;
     return;
   } else if (const auto *expr_logic = dynamic_cast<const LogicExpression *>(expr.get()); expr_logic != nullptr) {
-    if (expr_logic->logic_type_ == LogicType::And) {
-      // Now it's in form of (...) AND (...).
+    if (expr_logic->logic_type_ == LogicType::And) { /**< Now it's in form of (...) AND (...)*/
       BUSTUB_ENSURE(expr_logic->children_.size() == 2, "LogicExpression should have exactly 2 children.");
-      Read_predicate(expr->GetChildAt(0), key_exprs, fail);
-      Read_predicate(expr->GetChildAt(1), key_exprs, fail);
-    } else {
-      // it's not in form of (...) AND (...).
+      parser_expr_4_hash_join(expr->GetChildAt(0), key_exprs, fail);
+      parser_expr_4_hash_join(expr->GetChildAt(1), key_exprs, fail);
+    } else { /**< Now it's in form of (...) OR (...)*/
       fail = true;
       return;
     }
-  } else {
+  } else { /**< other expr type */
     fail = true;
     return;
-    // throw Exception("predicate shoud not has other expr type");
   }
 }
 
@@ -76,7 +90,7 @@ auto Optimizer::OptimizeNLJAsHashJoin(const AbstractPlanNodeRef &plan) -> Abstra
     BUSTUB_ASSERT(nlj_plan.GetChildren().size() == 2, "NLJ should have exactly 2 children");
     std::vector<std::vector<AbstractExpressionRef>> key_exprs(2);
     bool fail = false;
-    Read_predicate(nlj_plan.Predicate(), key_exprs, std::ref(fail));
+    parser_expr_4_hash_join(nlj_plan.Predicate(), key_exprs, std::ref(fail));
     if(!fail) {
       return std::make_shared<HashJoinPlanNode>(std::move(nlj_plan.output_schema_), std::move(nlj_plan.children_[0]),
                   std::move(nlj_plan.children_[1]), std::move(key_exprs[0]), std::move(key_exprs[1]), nlj_plan.join_type_);

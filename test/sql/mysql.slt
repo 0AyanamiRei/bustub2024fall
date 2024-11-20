@@ -1,7 +1,5 @@
 ./bin/bustub-sqllogictest ../test/sql/p3.15-multi-way-hash-join.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.14-hash-join.slt  --verbose
-
-
 ./bin/bustub-sqllogictest ../test/sql/p3.13-nested-index-join.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.12-repeat-execute.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.11-multi-way-join.slt  --verbose 
