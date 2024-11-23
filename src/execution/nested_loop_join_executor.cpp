@@ -97,8 +97,8 @@ auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 
 auto inline NestedLoopJoinExecutor::TryNext(Tuple *tuple, RID *rid) -> bool{
   if(!tuples_.empty()) {
-    *tuple = tuples_.back();
-    tuples_.pop_back();
+    *tuple = tuples_.front();
+    tuples_.pop_front();
     return true;
   }
   return false;

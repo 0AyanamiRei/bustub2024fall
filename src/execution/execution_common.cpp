@@ -19,13 +19,45 @@
 #include "storage/table/table_heap.h"
 
 namespace bustub {
-
+using std::cout, std::endl;
 TupleComparator::TupleComparator(std::vector<OrderBy> order_bys) : order_bys_(std::move(order_bys)) {}
 
-auto TupleComparator::operator()(const SortEntry &entry_a, const SortEntry &entry_b) const -> bool { return false; }
+auto TupleComparator::operator()(const SortEntry &entry_a, const SortEntry &entry_b) const -> bool {
+  auto &key_a = entry_a.first;
+  auto &key_b = entry_b.first;
+  for(uint32_t i = 0; i < key_a.size(); i ++) {
+    switch (order_bys_[i].first)
+    {
+    case OrderByType::INVALID:
+      throw Exception("invalid order_by type");
+    case OrderByType::DEFAULT: /**< 默认按ASC */
+    case OrderByType::ASC:  /**< 升序 */
+      if(key_a[i].CompareLessThan(key_b[i]) == CmpBool::CmpTrue) { // a < b
+        return true;
+      } else if (key_a[i].CompareGreaterThan(key_b[i]) == CmpBool::CmpTrue) { // a > b
+        return false;
+      } else { // a = b
+        continue;
+      }
+    case OrderByType::DESC: /**< 降序 */
+      if(key_a[i].CompareLessThan(key_b[i]) == CmpBool::CmpTrue) { // a < b
+        return false;
+      } else if (key_a[i].CompareGreaterThan(key_b[i]) == CmpBool::CmpTrue) { // a > b
+        return true;
+      } else { // a = b
+        continue;
+      }
+    }
+  }
+  return true;
+}
 
 auto GenerateSortKey(const Tuple &tuple, const std::vector<OrderBy> &order_bys, const Schema &schema) -> SortKey {
-  return {};
+  SortKey keys{};
+  for(auto &e : order_bys) {
+    keys.emplace_back(e.second->Evaluate(&tuple, schema));
+  }
+  return keys;
 }
 
 /**

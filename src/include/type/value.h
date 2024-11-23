@@ -173,16 +173,16 @@ class Value {
     uint64_t timestamp_;
     char *varlen_;
     const char *const_varlen_;
-  } value_;
+  } value_; // 8bytes
 
   union {
     uint32_t len_;
     TypeId elem_type_id_;
-  } size_;
+  } size_; // 4bytes
 
-  bool manage_data_;
+  bool manage_data_; // 1bytes
   // The data type
-  TypeId type_id_;
+  TypeId type_id_; // 4bytes
 };
 }  // namespace bustub
 

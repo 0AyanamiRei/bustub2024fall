@@ -34,7 +34,6 @@ HashJoinExecutor::HashJoinExecutor(ExecutorContext *exec_ctx, const HashJoinPlan
     if(!ht_.count(keys)) { /**< not hash collisions  */
       ht_[keys] = {tuple};
     } else { /**< hash collisions  */
-      cout << "hash collisions" << endl;
       ht_[keys].push_back(tuple);
     }
   }

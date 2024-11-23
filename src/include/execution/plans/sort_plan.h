@@ -23,7 +23,7 @@
 #include "execution/plans/abstract_plan.h"
 
 namespace bustub {
-
+using std::cout, std::endl;
 /**
  * The SortPlanNode represents a sort operation. It will sort the input with
  * the given predicate.
@@ -50,6 +50,29 @@ class SortPlanNode : public AbstractPlanNode {
 
   /** @return Get sort by expressions */
   auto GetOrderBy() const -> const std::vector<OrderBy> & { return order_bys_; }
+
+  void Show_order_bys() const {
+    for (auto &sort : order_bys_) {
+      std::string a;
+      switch (sort.first)
+      {
+      case OrderByType::INVALID:
+        a = "INVALID";
+        break;
+      case OrderByType::DEFAULT:
+        a = "DEFAULT";
+        break;
+      case OrderByType::ASC:
+        a = "ASC";
+        break;
+      case OrderByType::DESC:
+        a = "DESC";
+        break;
+      };
+      cout << a << "-" << sort.second->ToString() << " ";
+    }
+    cout << endl;
+  }
 
   BUSTUB_PLAN_NODE_CLONE_WITH_CHILDREN(SortPlanNode);
 

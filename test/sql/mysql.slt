@@ -1,3 +1,12 @@
+./bin/bustub-sqllogictest ../test/sql/p3.leaderboard-q3.slt --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.leaderboard-q2.slt --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.leaderboard-q1.slt --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.leaderboard-q1-index.slt --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.20-window-function.slt --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.19-integration-2.slt --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.18-integration-1.slt --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.17-topn.slt --verbose    
+./bin/bustub-sqllogictest ../test/sql/p3.16-sort-limit.slt  --verbose
 ./bin/bustub-sqllogictest ../test/sql/p3.15-multi-way-hash-join.slt  --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.14-hash-join.slt  --verbose
 ./bin/bustub-sqllogictest ../test/sql/p3.13-nested-index-join.slt  --verbose 
@@ -13,12 +22,3 @@
 ./bin/bustub-sqllogictest ../test/sql/p3.03-update.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.02-insert.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.01-seqscan.slt --verbose 
-
-
-create table t1(v1 int);
-insert into t1 (select * from __mock_table_123);
-explain (o)
-select * from test_simple_seq_2 t2 left join t1 on t1.v1 = t2.col1;
-
-select * from test_simple_seq_2;
-select * from t1;
