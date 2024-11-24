@@ -62,6 +62,7 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
   const NestedLoopJoinPlanNode *plan_;
   std::unique_ptr<AbstractExecutor> left_executor_;
   std::unique_ptr<AbstractExecutor> right_executor_;
+  /** (TODO) 存右表符合Join条件的Tuple的RID就比较节约内存 */
   std::deque<Tuple> tuples_;
 };
 

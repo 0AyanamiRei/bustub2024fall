@@ -26,15 +26,14 @@ ExternalMergeSortExecutor<K>::ExternalMergeSortExecutor(ExecutorContext *exec_ct
     : AbstractExecutor(exec_ctx),
       plan_(plan), 
       child_executor_(std::move(child_executor)),
-      cmp_(plan->GetOrderBy()), 
-      cursor(0) {
+      cmp_(plan->GetOrderBy()) {
   std::vector<MergeSortRun> runs;
   auto bpm = exec_ctx_->GetBufferPoolManager();
   auto sorted_runs = std::move(CreateSortedRuns());
   for(auto &page_id : sorted_runs) {
     runs.emplace_back(MergeSortRun({page_id}, bpm));
   }
-  /**< (TODO) 现已得到M个排好序的run, 下一步该k-way merge (k=2) */
+  /**< 现已得到M个排好序的run, 下一步该k-way merge (k=2) */
   size_t order_page_nums = 1;
   while(order_page_nums <= sorted_runs.size()) {
     std::vector<MergeSortRun> runs2;

@@ -37,6 +37,7 @@ namespace bustub {
 #define SORT_ENTRY_SIZE(KEY_VAL_NUMS, FIX_SIZE) (KEY_VAL_NUMS * VALUE_SIZE + RID_SIZE + FIX_SIZE)
 #define SORT_PAGE_CNT(KEY_VAL_NUMS, FIX_SIZE) \
   ((BUSTUB_PAGE_SIZE - SORT_PAGE_HEADER) / (KEY_VAL_NUMS * VALUE_SIZE + RID_SIZE + FIX_SIZE))
+
 /**
  * Page to hold the intermediate data for external merge sort.
  *
@@ -85,7 +86,6 @@ private:
   char data_[];
   // C++ style std::vector<char> data_;
 };
-
 
 /**
  * A data structure that holds the sorted tuples as a run during external merge sort.
@@ -209,13 +209,9 @@ class ExternalMergeSortExecutor : public AbstractExecutor {
   auto CreateSortedRuns () -> std::vector<page_id_t>;
   auto MergeRuns (MergeSortRun &a, MergeSortRun &b) -> std::vector<page_id_t>;
 
-  /** The sort plan node to be executed */
   const SortPlanNode *plan_;
   std::unique_ptr<AbstractExecutor> child_executor_;
-  /** Compares tuples based on the order-bys */
-  TupleComparator cmp_;
-  std::vector<SortEntry> data_;
-  uint32_t cursor;
+  TupleComparator cmp_; // 根据order_bys的内容来比较两个tuples
   page_id_t sort_page_id_;
   MergeSortRun runs_;
 };

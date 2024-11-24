@@ -25,7 +25,9 @@ NestIndexJoinExecutor::NestIndexJoinExecutor(ExecutorContext *exec_ctx, const Ne
   }
 }
 
-void NestIndexJoinExecutor::Init() {}
+void NestIndexJoinExecutor::Init() {
+  left_executor_->Init();
+}
 
 auto NestIndexJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   // Tuple r_tuple{};
