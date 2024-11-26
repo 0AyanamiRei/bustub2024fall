@@ -92,7 +92,7 @@ auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const Tuple
     }
 
     for (auto t : log.modified_fields_) {
-      
+      (void)t;
     }
 
     if (!log.prev_version_.IsValid()) {
