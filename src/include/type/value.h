@@ -181,7 +181,7 @@ class Value {
   } size_; // 4bytes
 
   bool manage_data_; // 1bytes
-  // The data type
+
   TypeId type_id_; // 4bytes
 };
 }  // namespace bustub

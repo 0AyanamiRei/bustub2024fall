@@ -33,11 +33,11 @@ class TupleComparator {
  public:
   explicit TupleComparator(std::vector<OrderBy> order_bys);
 
-  /** `entry_a` 和 `entry_b`的大小关系表明了升序还是降序, 视为vec[i], vec[i+1] */
+  /** 根据`order_bys_`比较`entry_a`和`entry_b` */
   auto operator()(const SortEntry &entry_a, const SortEntry &entry_b) const -> bool;
 
  private:
- /**< pair<OrderByType, AbstractExpressionRef> */
+ /**< OrderBy = pair<OrderByType, AbstractExpressionRef> */
   std::vector<OrderBy> order_bys_;
 };
 
@@ -51,8 +51,16 @@ auto GenerateSortKey(const Tuple &tuple, const std::vector<OrderBy> &order_bys, 
  * You can ignore the remaining part of this file until P4.
  */
 
+/** apply all modifications provided from `undo_logs` without checking the timestamp
+ * @warning 即该函数不会检查undo到指定版本, 需要在传入前裁剪undo_logs
+*/
 auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
                       const std::vector<UndoLog> &undo_logs) -> std::optional<Tuple>;
+
+/** 可以apply `undo_logs` 到指定时间戳`ts`的`ReconstructTuple(...)`调用 */
+[[maybe_unused]]
+auto ReconstructTuple2ts(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
+                         const std::vector<UndoLog> &undo_logs, timestamp_t ts) -> std::optional<Tuple>;
 
 auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tuple, std::optional<UndoLink> undo_link,
                      Transaction *txn, TransactionManager *txn_mgr) -> std::optional<std::vector<UndoLog>>;

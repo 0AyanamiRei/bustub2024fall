@@ -26,6 +26,11 @@ namespace bustub {
 class Schema;
 using SchemaRef = std::shared_ptr<const Schema>;
 
+/**
+ * Schema format
+ * - `columns_`: inline attributions
+ * - `uninlined_columns_`: uninlined attributions
+*/
 class Schema {
  public:
   /**
@@ -103,7 +108,7 @@ class Schema {
   /** Fixed-length column size, i.e. the number of bytes used by one tuple. */
   uint32_t length_;
 
-  /** All the columns in the schema, inlined and uninlined. */
+  /** All the columns in the schema, inlined and uninlined. (TODO) 应该是只存内联的 */
   std::vector<Column> columns_;
 
   /** True if all the columns are inlined, false otherwise. */

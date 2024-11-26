@@ -19,7 +19,7 @@
 #include "storage/table/table_heap.h"
 
 namespace bustub {
-using std::cout, std::endl;
+  
 TupleComparator::TupleComparator(std::vector<OrderBy> order_bys) : order_bys_(std::move(order_bys)) {}
 
 auto TupleComparator::operator()(const SortEntry &entry_a, const SortEntry &entry_b) const -> bool {
@@ -78,8 +78,40 @@ auto GenerateSortKey(const Tuple &tuple, const std::vector<OrderBy> &order_bys, 
  */
 auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
                       const std::vector<UndoLog> &undo_logs) -> std::optional<Tuple> {
+  std::vector<Value> values;
+  // values.reserve(schema->GetColumnCount());
+  for(size_t i = 0, n = schema->GetColumnCount(); i < n ; i ++) {
+    values.push_back(base_tuple.GetValue(schema, i));
+  }
+  BUSTUB_ENSURE(values.size() == schema->GetColumnCount(), "error size of values");
+  // Now we got the copy of base_tuple's values
+
+  for (auto &log : undo_logs) {
+    if (log.is_deleted_) {
+      // ...
+    }
+
+    for (auto t : log.modified_fields_) {
+      
+    }
+
+    if (!log.prev_version_.IsValid()) {
+      // ...
+    }
+  }
+
+  return Tuple{values, schema};
+}
+
+
+auto ReconstructTuple2ts(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
+                         const std::vector<UndoLog> &undo_logs, timestamp_t ts) -> std::optional<Tuple> {
+  if(ts == 0) {
+    return std::nullopt;
+  }
   UNIMPLEMENTED("not implemented");
 }
+
 
 /**
  * @brief Collects the undo logs sufficient to reconstruct the tuple w.r.t. the txn.

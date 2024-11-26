@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <set>
 
 #include "concurrency/transaction.h"
 #include "storage/table/tuple.h"
@@ -24,7 +25,7 @@ class Watermark {
   auto UpdateCommitTs(timestamp_t commit_ts) { commit_ts_ = commit_ts; }
 
   auto GetWatermark() -> timestamp_t {
-    if (current_reads_.empty()) {
+    if (reads_ts_map_.empty()) {
       return commit_ts_;
     }
     return watermark_;
@@ -32,9 +33,10 @@ class Watermark {
 
   timestamp_t commit_ts_;
 
-  timestamp_t watermark_;
+  timestamp_t watermark_; /**< 未提交或者中止的事务中最小的read_ts */
 
-  std::unordered_map<timestamp_t, int> current_reads_;
+  std::unordered_map<timestamp_t, int> reads_ts_map_;
+  std::set<timestamp_t> reads_ts_set_;
 };
 
 };  // namespace bustub

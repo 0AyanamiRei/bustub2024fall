@@ -74,7 +74,7 @@ struct UndoLog {
   /* Whether this log is a deletion marker */
   bool is_deleted_;
   /* The fields modified by this undo log */
-  std::vector<bool> modified_fields_;
+  std::vector<bool> modified_fields_; // C++: std::vector<bool>偏特化的实现, 需要特别注意 
   /* The modified fields */
   Tuple tuple_;
   /* Timestamp of this undo log */
@@ -187,6 +187,8 @@ class Transaction {
   /**
    * @brief Store undo logs. Other undo logs / table heap will store (txn_id, index) pairs, and therefore
    * you should only append to this vector or update things in-place without removing anything.
+   * 
+   * @todo (TODO) 一个txn可以存放一个tuple的多份undo日志吗?
    */
   std::vector<UndoLog> undo_logs_;
 

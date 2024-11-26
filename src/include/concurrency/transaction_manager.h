@@ -113,10 +113,14 @@ class TransactionManager {
   /** The last committed timestamp. */
   std::atomic<timestamp_t> last_commit_ts_{0};
 
+  /** The monotonically-increasing commit timestamp */
+  std::atomic<timestamp_t> commit_ts_{0};
+
   /** Catalog */
   Catalog *catalog_;
 
   std::atomic<txn_id_t> next_txn_id_{TXN_START_ID};
+  
 
  private:
   /** @brief Verify if a txn satisfies serializability. We will not test this function and you can change / remove it as
