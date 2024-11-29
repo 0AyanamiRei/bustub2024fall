@@ -17,6 +17,7 @@
 #include "concurrency/transaction_manager.h"
 #include "fmt/core.h"
 #include "storage/table/table_heap.h"
+#include "type/value_factory.h"
 
 namespace bustub {
   
@@ -78,28 +79,41 @@ auto GenerateSortKey(const Tuple &tuple, const std::vector<OrderBy> &order_bys, 
  */
 auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
                       const std::vector<UndoLog> &undo_logs) -> std::optional<Tuple> {
+  // txn_scan_test-case补充: table heap中的tuple已被删除且没有undo_log
+  if (base_meta.is_deleted_ && undo_logs.size() == 0U) {
+    return std::nullopt;
+  }
+  // txn_scan_test-case补充: 如果最后一个undo_log是delete, 返回空
+  if (!undo_logs.empty() && undo_logs.back().is_deleted_) {
+    return std::nullopt;
+  }
   std::vector<Value> values;
   // values.reserve(schema->GetColumnCount());
   for(size_t i = 0, n = schema->GetColumnCount(); i < n ; i ++) {
     values.push_back(base_tuple.GetValue(schema, i));
   }
   BUSTUB_ENSURE(values.size() == schema->GetColumnCount(), "error size of values");
-  // Now we got the copy of base_tuple's values
-
+  // Now we got the copy of base_tuple's values (latest tuple)
   for (auto &log : undo_logs) {
-    if (log.is_deleted_) {
-      // ...
-    }
-
-    for (auto t : log.modified_fields_) {
-      (void)t;
-    }
-
-    if (!log.prev_version_.IsValid()) {
-      // ...
+    if (log.is_deleted_) { // 清空values
+      for(size_t i = 0, n = schema->GetColumnCount(); i < n ; i ++) {
+        values[i] = ValueFactory::GetNullValueByType(values[i].GetTypeId());
+      }
+    } else {
+      uint32_t i;
+      uint32_t len;
+      std::vector<uint32_t> attrs;
+      for (i = 0, len = log.modified_fields_.size(); i < len; ++i) {
+        if (log.modified_fields_[i]) {
+          attrs.push_back(i);
+        }
+      }
+      const auto schema_log = Schema::CopySchema(schema, attrs);
+      for (i = 0, len = attrs.size(); i < len; ++i) {
+        values[attrs[i]] = log.tuple_.GetValue(&schema_log, i); 
+      }
     }
   }
-
   return Tuple{values, schema};
 }
 
@@ -127,7 +141,27 @@ auto ReconstructTuple2ts(const Schema *schema, const Tuple &base_tuple, const Tu
  */
 auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tuple, std::optional<UndoLink> undo_link,
                      Transaction *txn, TransactionManager *txn_mgr) -> std::optional<std::vector<UndoLog>> {
-  UNIMPLEMENTED("not implemented");
+  auto read_ts = txn->GetReadTs();
+
+  if ((txn->GetTransactionTempTs() == base_meta.ts_ /** case3: 最新的tuple是在当前事务中修改的 */
+          && base_meta.ts_ >= TXN_START_ID) || read_ts >= base_meta.ts_) { /** case1: 最新的tuple就是要读的版本 */
+    return std::vector<UndoLog>{};
+  } else { /** case2: 需要获取重构到read_ts可读的版本所需的日志 */
+    std::vector<UndoLog> logs;
+    std::optional<bustub::UndoLog> undo_log;
+    auto undo_link = txn_mgr->GetUndoLink(base_tuple.GetRid());
+    if (undo_link.has_value()) {
+      undo_log = txn_mgr->GetUndoLogOptional(*undo_link);
+      while (undo_log.has_value()) {
+        logs.emplace_back(std::move(*undo_log));
+        if (read_ts >= logs.back().ts_) {
+          return logs;
+        }
+        undo_log = txn_mgr->GetUndoLogOptional(undo_log->prev_version_);
+      }
+    }
+    return std::nullopt;
+  }
 }
 
 /**

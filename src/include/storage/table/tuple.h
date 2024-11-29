@@ -106,6 +106,9 @@ class Tuple {
   // checks the schema to see how to return the Value.
   auto GetValue(const Schema *schema, uint32_t column_idx) const -> Value;
 
+  // 便于P4的版本 用另一个schema+两个idx来获取value
+  auto GetValue(const Schema *schema, uint32_t idx_in_schema, uint32_t idx_in_tuple) const -> Value;
+
   // Generates a key tuple given schemas and attributes
   auto KeyFromTuple(const Schema &schema, const Schema &key_schema, const std::vector<uint32_t> &key_attrs) const
       -> Tuple;

@@ -104,7 +104,7 @@ class Transaction {
   /** @return the id of this transaction, stripping the highest bit. NEVER use/store this value unless for debugging. */
   inline auto GetTransactionIdHumanReadable() const -> txn_id_t { return txn_id_ ^ TXN_START_ID; }
 
-  /** @return the temporary timestamp of this transaction */
+  /** @return the temporary timestamp of this transaction `TXN_START_ID` + `xxx` */
   inline auto GetTransactionTempTs() const -> timestamp_t { return txn_id_; }
 
   /** @return the isolation level of this transaction */
@@ -187,7 +187,6 @@ class Transaction {
   /**
    * @brief Store undo logs. Other undo logs / table heap will store (txn_id, index) pairs, and therefore
    * you should only append to this vector or update things in-place without removing anything.
-   * 
    * @todo (TODO) 一个txn可以存放一个tuple的多份undo日志吗?
    */
   std::vector<UndoLog> undo_logs_;
@@ -198,15 +197,9 @@ class Transaction {
   std::unordered_map<table_oid_t, std::vector<AbstractExpressionRef>> scan_predicates_;
 
   // The below fields are set when a txn is created and will NEVER be changed.
-
-  /** The isolation level of the transaction. */
-  const IsolationLevel isolation_level_;
-
-  /** The thread ID which the txn starts from.  */
-  const std::thread::id thread_id_;
-
-  /** The ID of this transaction. */
-  const txn_id_t txn_id_;
+  const IsolationLevel isolation_level_; /** The isolation level of the transaction. */
+  const std::thread::id thread_id_;      /** The thread ID which the txn starts from.  */
+  const txn_id_t txn_id_;                /** The ID of this transaction. */
 };
 
 }  // namespace bustub

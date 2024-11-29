@@ -75,6 +75,10 @@ auto Tuple::GetValue(const Schema *schema, const uint32_t column_idx) const -> V
   return Value::DeserializeFrom(data_ptr, column_type);
 }
 
+auto Tuple::GetValue(const Schema *schema, uint32_t idx_in_schema, uint32_t idx_in_tuple) const -> Value {
+  throw NotImplementedException("暂时不用于实验");
+}
+
 auto Tuple::KeyFromTuple(const Schema &schema, const Schema &key_schema, const std::vector<uint32_t> &key_attrs) const
     -> Tuple {
   std::vector<Value> values;
