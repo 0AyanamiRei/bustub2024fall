@@ -1,28 +1,26 @@
 #include <iostream>
-#include <queue>
-#include <vector>
-#include <unordered_map>
-#include <set>
+#include <tuple>
+#include <cstddef>
 
-using namespace std;
+struct TupleMeta {
+  char data[16]; // 假设 TupleMeta 的大小为 16 字节
+};
+
+using TupleInfo = std::tuple<uint16_t, uint16_t, TupleMeta>;
 
 int main() {
-    std::set<int> s;
+  std::cout << "sizeof(TupleInfo): " << sizeof(TupleInfo) << std::endl;
+  std::cout << "alignof(TupleInfo): " << alignof(TupleInfo) << std::endl;
 
-    s.insert(10);
-    s.insert(5);
-    s.insert(20);
+  TupleInfo tuple;
+  std::cout << "Address of std::get<0>(tuple): " << static_cast<const void*>(&std::get<0>(tuple)) << std::endl;
+  std::cout << "Address of std::get<1>(tuple): " << static_cast<const void*>(&std::get<1>(tuple)) << std::endl;
+  std::cout << "Address of std::get<2>(tuple): " << static_cast<const void*>(&std::get<2>(tuple)) << std::endl;
 
-    std::cout << "Set elements: ";
-    for (const auto& elem : s) {
-        std::cout << elem << " ";
-    }
-    std::cout << std::endl;
+  // 计算每个元素的偏移量
+  std::cout << "Offset of element 0: " << reinterpret_cast<const char*>(&std::get<0>(tuple)) - reinterpret_cast<const char*>(&tuple) << std::endl;
+  std::cout << "Offset of element 1: " << reinterpret_cast<const char*>(&std::get<1>(tuple)) - reinterpret_cast<const char*>(&tuple) << std::endl;
+  std::cout << "Offset of element 2: " << reinterpret_cast<const char*>(&std::get<2>(tuple)) - reinterpret_cast<const char*>(&tuple) << std::endl;
 
-    auto it = s.find(5);
-    s.erase(10);
-    auto min_val = *s.begin(); // 最小值
-    auto max_val = *s.rbegin(); // 最大值
-
-    return 0;
+  return 0;
 }

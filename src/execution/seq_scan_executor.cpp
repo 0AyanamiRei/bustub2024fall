@@ -26,24 +26,23 @@ void SeqScanExecutor::Init() {
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   while(!iter_->IsEnd()) {
     auto [meta, data] = iter_->GetTuple();
-    /**< 跳过 */
-    if(meta.is_deleted_) {
-      ++(*iter_.get());
-      continue;
-    }
-    *tuple = data;
-    *rid = iter_->GetRID();
-    /**< 应用谓词 */
-    if(plan_->filter_predicate_) {
-      auto value = plan_->filter_predicate_->Evaluate(tuple, GetOutputSchema());
-      if (value.IsNull() || !value.GetAs<bool>()) {
-        ++(*iter_.get());
-        continue;
-      }
-    }
-    /**< 返回 */
+    // Get the readable version of the tuple
+    auto t = GetReadableTuple(&GetOutputSchema(), data, meta, exec_ctx_->GetTransaction(),
+                                 exec_ctx_->GetTransactionManager());
     ++(*iter_.get());
-    return true;
+    if(t.has_value()) {
+      *tuple = *t;
+      *rid = tuple->GetRid();
+      if(plan_->filter_predicate_) {
+        auto value = plan_->filter_predicate_->Evaluate(tuple, GetOutputSchema());
+        if (value.IsNull() || !value.GetAs<bool>()) {
+          // This tuple was filtered out
+          continue;
+        }
+      }
+      // Now return true
+      return true;
+    }
   }
   return false;
 }

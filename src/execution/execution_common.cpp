@@ -20,7 +20,11 @@
 #include "type/value_factory.h"
 
 namespace bustub {
-  
+
+// Inner Help function
+
+inline auto GetReadableTs(timestamp_t ts) -> timestamp_t { return ts >= TXN_START_ID ? ts ^ TXN_START_ID : ts; }
+
 TupleComparator::TupleComparator(std::vector<OrderBy> order_bys) : order_bys_(std::move(order_bys)) {}
 
 auto TupleComparator::operator()(const SortEntry &entry_a, const SortEntry &entry_b) const -> bool {
@@ -79,16 +83,15 @@ auto GenerateSortKey(const Tuple &tuple, const std::vector<OrderBy> &order_bys, 
  */
 auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
                       const std::vector<UndoLog> &undo_logs) -> std::optional<Tuple> {
-  // txn_scan_test-case补充: table heap中的tuple已被删除且没有undo_log
+  // txn_scan_test-case add: base_tuple in marked `is_deleted` and redo_logs is empty
   if (base_meta.is_deleted_ && undo_logs.size() == 0U) {
     return std::nullopt;
   }
-  // txn_scan_test-case补充: 如果最后一个undo_log是delete, 返回空
+  // txn_scan_test-case add: if last undo_log is delete, return nullopt
   if (!undo_logs.empty() && undo_logs.back().is_deleted_) {
     return std::nullopt;
   }
   std::vector<Value> values;
-  // values.reserve(schema->GetColumnCount());
   for(size_t i = 0, n = schema->GetColumnCount(); i < n ; i ++) {
     values.push_back(base_tuple.GetValue(schema, i));
   }
@@ -100,32 +103,16 @@ auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const Tuple
         values[i] = ValueFactory::GetNullValueByType(values[i].GetTypeId());
       }
     } else {
-      uint32_t i;
-      uint32_t len;
       std::vector<uint32_t> attrs;
-      for (i = 0, len = log.modified_fields_.size(); i < len; ++i) {
-        if (log.modified_fields_[i]) {
-          attrs.push_back(i);
-        }
-      }
-      const auto schema_log = Schema::CopySchema(schema, attrs);
-      for (i = 0, len = attrs.size(); i < len; ++i) {
+      const auto schema_log = GetUndoLogSchema(schema, log, &attrs);
+      // use attrs and schema_log to rebuild the tuple
+      for (uint32_t i = 0, len = attrs.size(); i < len; ++i) {
         values[attrs[i]] = log.tuple_.GetValue(&schema_log, i); 
       }
     }
   }
   return Tuple{values, schema};
 }
-
-
-auto ReconstructTuple2ts(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
-                         const std::vector<UndoLog> &undo_logs, timestamp_t ts) -> std::optional<Tuple> {
-  if(ts == 0) {
-    return std::nullopt;
-  }
-  UNIMPLEMENTED("not implemented");
-}
-
 
 /**
  * @brief Collects the undo logs sufficient to reconstruct the tuple w.r.t. the txn.
@@ -142,26 +129,36 @@ auto ReconstructTuple2ts(const Schema *schema, const Tuple &base_tuple, const Tu
 auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tuple, std::optional<UndoLink> undo_link,
                      Transaction *txn, TransactionManager *txn_mgr) -> std::optional<std::vector<UndoLog>> {
   auto read_ts = txn->GetReadTs();
-
-  if ((txn->GetTransactionTempTs() == base_meta.ts_ /** case3: 最新的tuple是在当前事务中修改的 */
-          && base_meta.ts_ >= TXN_START_ID) || read_ts >= base_meta.ts_) { /** case1: 最新的tuple就是要读的版本 */
+  // The base_tuple just we can read, so return empty vector
+  if ((txn->GetTransactionTempTs() == base_meta.ts_ 
+       && base_meta.ts_ >= TXN_START_ID) ||
+      read_ts >= base_meta.ts_) {
     return std::vector<UndoLog>{};
-  } else { /** case2: 需要获取重构到read_ts可读的版本所需的日志 */
-    std::vector<UndoLog> logs;
-    std::optional<bustub::UndoLog> undo_log;
-    auto undo_link = txn_mgr->GetUndoLink(base_tuple.GetRid());
-    if (undo_link.has_value()) {
-      undo_log = txn_mgr->GetUndoLogOptional(*undo_link);
-      while (undo_log.has_value()) {
-        logs.emplace_back(std::move(*undo_log));
-        if (read_ts >= logs.back().ts_) {
-          return logs;
-        }
-        undo_log = txn_mgr->GetUndoLogOptional(undo_log->prev_version_);
-      }
-    }
-    return std::nullopt;
   }
+  // We need to collect enough undo_log to reconstruct the tuple
+  if (undo_link.has_value()) {
+    std::vector<UndoLog> logs;
+    auto undo_log = txn_mgr->GetUndoLogOptional(*undo_link);
+    while (undo_log.has_value()) {
+      logs.emplace_back(std::move(*undo_log));
+      if (read_ts >= logs.back().ts_) {
+        return logs;
+      }
+      undo_log = txn_mgr->GetUndoLogOptional(undo_log->prev_version_);
+    }
+  }
+  return std::nullopt;
+}
+
+// equivalent to `ReconstructTuple`+`CollectUndoLogs`
+auto GetReadableTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta, Transaction *txn,
+                      TransactionManager *txn_mgr) -> std::optional<Tuple>{
+  auto undo_link = txn_mgr->GetUndoLink(base_tuple.GetRid());
+  auto undo_logs = undo_link.has_value()
+                       ? CollectUndoLogs(base_tuple.GetRid(), base_meta, base_tuple, undo_link, txn, txn_mgr)
+                       : std::nullopt;
+  auto tuple = undo_logs.has_value() ? ReconstructTuple(schema, base_tuple, base_meta, *undo_logs) : std::nullopt;
+  return tuple;
 }
 
 /**
@@ -199,11 +196,47 @@ void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const Table
                TableHeap *table_heap) {
   // always use stderr for printing logs...
   fmt::println(stderr, "debug_hook: {}", info);
-
-  fmt::println(
-      stderr,
-      "You see this line of text because you have not implemented `TxnMgrDbg`. You should do this once you have "
-      "finished task 2. Implementing this helper function will save you a lot of time for debugging in later tasks.");
+  auto iter = table_heap->MakeIterator();
+  while (!iter.IsEnd()) {
+    auto rid = iter.GetRID();
+    auto [metadata, tuple] = iter.GetTuple();
+    fmt::println("RID={}/{} ts={} tuple={}", rid.GetPageId(), rid.GetSlotNum(), GetReadableTs(metadata.ts_),
+                 tuple.ToString(&table_info->schema_));
+    auto undo_link = txn_mgr->GetUndoLink(rid);
+    if (undo_link.has_value()) {
+      auto undo_log = txn_mgr->GetUndoLogOptional(*undo_link);
+      while (undo_log.has_value()) {
+        const auto schema_log = GetUndoLogSchema(&table_info->schema_, *undo_log, nullptr);
+        std::stringstream ss;
+        ss << fmt::format("  txn{}@{} ", GetReadableTs(undo_link->prev_txn_), undo_link->prev_log_idx_);
+        // if (undo_log->is_deleted_) {
+        //   ss << "<del>";
+        // } else {
+        //   ss << "(";
+        //   for (uint32_t i = 0, j = 0, n = table_info->schema_.GetColumnCount(); i < n ; ++i) {
+        //     if (i!=0U) {
+        //       ss << " ";
+        //     }
+        //     if (undo_log->modified_fields_[i]) {
+        //       auto val = undo_log->tuple_.GetValue(&schema_log, j++);
+        //       if (val.IsNull()) {
+        //         ss << "<NULL>";
+        //       }
+        //       ss << fmt::format("{},", val.ToString());
+        //     } else {
+        //       ss << fmt::format("_,");
+        //     }
+        //   }
+        //   ss << ")";
+        // }
+        ss <<  UndoLogToString(&table_info->schema_, *undo_log);
+        fmt::println("{}", ss.str());
+        undo_link = undo_log->prev_version_;
+        undo_log = txn_mgr->GetUndoLogOptional(undo_log->prev_version_);
+      }
+    }
+    ++iter;
+  }
 
   // We recommend implementing this function as traversing the table heap and print the version chain. An example output
   // of our reference solution:
@@ -220,5 +253,49 @@ void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const Table
   //   txn6@0 (6, <NULL>, <NULL>) ts=2
   //   txn3@1 (7, _, _) ts=1
 }
+
+auto GetUndoLogSchema(const Schema *schema, const UndoLog &log, std::vector<uint32_t> *attrs) -> Schema {
+  std::vector<uint32_t> local_attrs;
+  if (attrs == nullptr) {
+    attrs = &local_attrs;
+  }
+  for (uint32_t i = 0, len = log.modified_fields_.size(); i < len; ++i) {
+    if (log.modified_fields_[i]) {
+      attrs->push_back(i);
+    }
+  }
+  return Schema::CopySchema(schema, *attrs);
+}
+
+auto UndoLogToString(const Schema *schema, const UndoLog &log) -> std::string {
+  std::stringstream ss;
+  if (log.is_deleted_) {
+    ss << "<del>";
+  } else {
+    const auto schema_log = GetUndoLogSchema(schema, log, nullptr);
+    ss << "(";
+    for (uint32_t i = 0, j = 0, n = schema->GetColumnCount(); i < n ; ++i) {
+        if (i != 0U) {
+          ss << " ";
+        }
+        if (log.modified_fields_[i]) {
+          auto val = log.tuple_.GetValue(&schema_log, j++);
+          if (val.IsNull()) {
+            ss << "<NULL>";
+          } else {
+            ss << fmt::format("{}", val.ToString());
+          }
+        } else {
+          ss << fmt::format("_");
+        }
+        if (i+1 < n) {
+          ss << ",";
+        }
+    }
+    ss << ")";
+  }
+  return fmt::format("{} ts={}", ss.str(), GetReadableTs(log.ts_));
+}
+
 
 }  // namespace bustub

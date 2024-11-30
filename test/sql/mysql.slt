@@ -22,3 +22,38 @@
 ./bin/bustub-sqllogictest ../test/sql/p3.03-update.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.02-insert.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.01-seqscan.slt --verbose 
+
+
+CREATE TABLE t1(a int, b double, c int);
+BEGIN;
+\txn -1
+BEGIN;
+COMMIT;
+BEGIN;
+\txn -1
+BEGIN;
+INSERT INTO t1 VALUES (4, 4.0, 1);
+INSERT INTO t1 VALUES (7);
+COMMIT;
+
+BEGIN;
+\txn -1
+BEGIN;
+delete from t1 where a = 4;
+COMMIT;
+
+BEGIN;
+\txn -1
+BEGIN;
+update t1 set a = 6 where a = 7;
+COMMIT;
+
+BEGIN;
+\txn -1
+BEGIN;
+COMMIT;
+
+BEGIN;
+\txn -1
+BEGIN;
+

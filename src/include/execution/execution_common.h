@@ -57,13 +57,12 @@ auto GenerateSortKey(const Tuple &tuple, const std::vector<OrderBy> &order_bys, 
 auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
                       const std::vector<UndoLog> &undo_logs) -> std::optional<Tuple>;
 
-/** 可以apply `undo_logs` 到指定时间戳`ts`的`ReconstructTuple(...)`调用 */
-[[maybe_unused]]
-auto ReconstructTuple2ts(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
-                         const std::vector<UndoLog> &undo_logs, timestamp_t ts) -> std::optional<Tuple>;
-
 auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tuple, std::optional<UndoLink> undo_link,
                      Transaction *txn, TransactionManager *txn_mgr) -> std::optional<std::vector<UndoLog>>;
+
+/** 获取当前事务可见的tuple版本 */
+auto GetReadableTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta, Transaction *txn,
+                      TransactionManager *txn_mgr) -> std::optional<Tuple>;
 
 auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tuple *target_tuple, timestamp_t ts,
                         UndoLink prev_version) -> UndoLog;
@@ -71,8 +70,13 @@ auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tup
 auto GenerateUpdatedUndoLog(const Schema *schema, const Tuple *base_tuple, const Tuple *target_tuple,
                             const UndoLog &log) -> UndoLog;
 
+// Help functions 
+
 void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const TableInfo *table_info,
                TableHeap *table_heap);
+
+auto GetUndoLogSchema(const Schema *schema, const UndoLog &log, std::vector<uint32_t> *attrs) -> Schema;
+auto UndoLogToString(const Schema *schema, const UndoLog &log) -> std::string;
 
 // TODO(P4): Add new functions as needed... You are likely need to define some more functions.
 //

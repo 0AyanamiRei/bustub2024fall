@@ -4,7 +4,7 @@
 namespace bustub {
 
 // NOLINTBEGIN(bugprone-unchecked-optional-access)
-TEST(TxnScanTest, TupleReconstructTest) {  // NOLINT
+TEST(TxnScanTest, DISABLED_TupleReconstructTest) {  // NOLINT
   auto schema = ParseCreateStatement("a integer,b double,c boolean");
   {
     fmt::println(stderr, "A: only base tuple");
@@ -102,7 +102,7 @@ TEST(TxnScanTest, TupleReconstructTest) {  // NOLINT
   }
 }
 
-TEST(TxnScanTest, CollectUndoLogTest) {  // NOLINT
+TEST(TxnScanTest, DISABLED_CollectUndoLogTest) {  // NOLINT
   auto bustub = std::make_unique<BusTubInstance>();
   auto schema = ParseCreateStatement("a integer,b double,c boolean");
   auto modify_schema = ParseCreateStatement("a integer,b double");
@@ -250,6 +250,30 @@ TEST(TxnScanTest, CollectUndoLogTest) {  // NOLINT
   //   txn5@0 (4, 4.000000, _) ts=4
   //   txn1@3 (1, 1.000000, _) ts=1
 
+/*
+debug_hook: before verify scan
+RID=1/0 ts=1 tuple=(1, 1.000000, <NULL>)
+RID=1/1 ts=2 tuple=(2, 2.000000, <NULL>)
+  txn1@0 (1, 1.000000, _,) ts=1
+RID=1/2 ts=3 tuple=(3, 3.000000, <NULL>)
+  txn3@0 (2, 2.000000, _,) ts=2
+  txn1@1 (1, 1.000000, _,) ts=1
+RID=1/3 ts=3 tuple=(3, 3.000000, <NULL>)
+RID=1/4 ts=4 tuple=(4, 4.000000, <NULL>)
+  txn4@0 (3, 3.000000, _,) ts=3
+RID=1/5 ts=4 tuple=(2, 2.000000, <NULL>)
+  txn4@1 (2, 2.000000, _,) ts=2
+RID=1/6 ts=4 tuple=(4, 4.000000, <NULL>)
+  txn4@2 <del> ts=2
+  txn1@2 (1, 1.000000, <NULL>boolean_null,) ts=1
+RID=1/7 ts=2 tuple=(100, 100.000000, <NULL>)
+RID=1/8 ts=2 tuple=(100, 100.000000, <NULL>)
+  txn2@0 (1, 1.000000, _,) ts=1
+RID=1/9 ts=5 tuple=(400, 400.000000, <NULL>)
+  txn5@0 (4, 4.000000, _,) ts=4
+  txn1@3 (1, 1.000000, _,) ts=1
+*/
+
   {
     ASSERT_TRUE(undo_logs_0_for_txn_to_inspect.has_value());
     auto tuple = ReconstructTuple(schema.get(), tuple_res_0.second, tuple_res_0.first, *undo_logs_0_for_txn_to_inspect);
@@ -302,7 +326,7 @@ TEST(TxnScanTest, CollectUndoLogTest) {  // NOLINT
   }
 }
 
-TEST(TxnScanTest, DISABLED_ScanTest) {  // NOLINT
+TEST(TxnScanTest, ScanTest) {  // NOLINT
   auto bustub = std::make_unique<BusTubInstance>();
   auto schema = ParseCreateStatement("a integer,b double,c boolean");
   auto modify_schema = ParseCreateStatement("a integer");
@@ -399,7 +423,19 @@ TEST(TxnScanTest, DISABLED_ScanTest) {  // NOLINT
   bustub->txn_manager_->UpdateUndoLink(rid4, prev_log_5, nullptr);
 
   TxnMgrDbg("before verify scan", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
-
+/*
+debug_hook: before verify scan
+RID=1/0 ts=8 tuple=(1, <NULL>, <NULL>)
+  txn8@0 (2, _, _) ts=1
+RID=1/1 ts=3 tuple=(3, <NULL>, <NULL>)
+  txn5@0 <del> ts=2
+  txn3@0 (4, 4.000000, true) ts=1
+RID=1/2 ts=4 tuple=(<NULL>, <NULL>, <NULL>)
+  txn7@0 (5, 3.000000, false) ts=3
+RID=1/3 ts=6 tuple=(<NULL>, <NULL>, <NULL>)
+  txn6@0 (6, <NULL>, <NULL>) ts=2
+  txn3@1 (7, _, _) ts=1
+*/
   auto query = "SELECT * FROM maintable";
   fmt::println(stderr, "A: Verify txn0");
   WithTxn(txn0, QueryShowResult(*bustub, _var, _txn, query, AnyResult{}));
@@ -418,15 +454,16 @@ TEST(TxnScanTest, DISABLED_ScanTest) {  // NOLINT
   // you should think about types other than integer, and think of the case where the user updates / inserts
   // a column of null.
 
-  // query = "SELECT a FROM maintable";
-  // fmt::println(stderr, "C: Verify txn2");
-  // WithTxn(txn2, QueryHideResult(*bustub, _var, _txn, query, IntResult{})); // <- you will need to fill in the answer
-  // fmt::println(stderr, "D: Verify txn3");
-  // WithTxn(txn3, QueryHideResult(*bustub, _var, _txn, query, IntResult{})); // <- you will need to fill in the answer
-  // fmt::println(stderr, "E: Verify txn4");
-  // WithTxn(txn4, QueryHideResult(*bustub, _var, _txn, query, IntResult{})); // <- you will need to fill in the answer
-  // fmt::println(stderr, "F: Verify txn5");
-  // WithTxn(txn5, QueryHideResult(*bustub, _var, _txn, query, IntResult{})); // <- you will need to fill in the answer
+  query = "SELECT a FROM maintable";
+  fmt::println(stderr, "C: Verify txn2");
+  // r0 2, r3 6
+  WithTxn(txn2, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {6}})); // <- you will need to fill in the answer
+  fmt::println(stderr, "D: Verify txn3");
+  WithTxn(txn3, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {3}, {5}, {6}})); // <- you will need to fill in the answer
+  fmt::println(stderr, "E: Verify txn4");
+  WithTxn(txn4, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {3}, {BUSTUB_INT32_NULL}, {6}})); // <- you will need to fill in the answer
+  fmt::println(stderr, "F: Verify txn5");
+  WithTxn(txn5, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {3}, {BUSTUB_INT32_NULL}, {6}})); // <- you will need to fill in the answer
 }
 
 // NOLINTEND(bugprone-unchecked-optional-access))

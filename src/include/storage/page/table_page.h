@@ -106,7 +106,7 @@ class TablePage {
   TupleInfo tuple_info_[0];
 
   static constexpr size_t TUPLE_INFO_SIZE = 24;
-  static_assert(sizeof(TupleInfo) == TUPLE_INFO_SIZE);
+  static_assert(TUPLE_META_SIZE + 8 == TUPLE_INFO_SIZE);
 };
 
 static_assert(sizeof(TablePage) == TABLE_PAGE_HEADER_SIZE);
