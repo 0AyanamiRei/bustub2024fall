@@ -195,48 +195,39 @@ auto GenerateUpdatedUndoLog(const Schema *schema, const Tuple *base_tuple, const
 void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const TableInfo *table_info,
                TableHeap *table_heap) {
   // always use stderr for printing logs...
+  std::stringstream ss;
   fmt::println(stderr, "debug_hook: {}", info);
   auto iter = table_heap->MakeIterator();
   while (!iter.IsEnd()) {
     auto rid = iter.GetRID();
     auto [metadata, tuple] = iter.GetTuple();
-    fmt::println("RID={}/{} ts={} tuple={}", rid.GetPageId(), rid.GetSlotNum(), GetReadableTs(metadata.ts_),
-                 tuple.ToString(&table_info->schema_));
+    ss << fmt::format("RID={}/{}", rid.GetPageId(), rid.GetSlotNum());
+    if (metadata.ts_ & TXN_START_ID) {
+      ss << fmt::format(" ts={}* ", metadata.ts_ ^ TXN_START_ID);
+    } else {
+      ss << fmt::format(" ts={}  ", metadata.ts_);
+    }
+    if (metadata.is_deleted_) {
+      ss << "<del>\n";
+    } else {
+      ss << tuple.ToString(&table_info->schema_) << "\n";
+    }
     auto undo_link = txn_mgr->GetUndoLink(rid);
     if (undo_link.has_value()) {
       auto undo_log = txn_mgr->GetUndoLogOptional(*undo_link);
       while (undo_log.has_value()) {
         const auto schema_log = GetUndoLogSchema(&table_info->schema_, *undo_log, nullptr);
-        std::stringstream ss;
-        ss << fmt::format("  txn{}@{} ", GetReadableTs(undo_link->prev_txn_), undo_link->prev_log_idx_);
-        // if (undo_log->is_deleted_) {
-        //   ss << "<del>";
-        // } else {
-        //   ss << "(";
-        //   for (uint32_t i = 0, j = 0, n = table_info->schema_.GetColumnCount(); i < n ; ++i) {
-        //     if (i!=0U) {
-        //       ss << " ";
-        //     }
-        //     if (undo_log->modified_fields_[i]) {
-        //       auto val = undo_log->tuple_.GetValue(&schema_log, j++);
-        //       if (val.IsNull()) {
-        //         ss << "<NULL>";
-        //       }
-        //       ss << fmt::format("{},", val.ToString());
-        //     } else {
-        //       ss << fmt::format("_,");
-        //     }
-        //   }
-        //   ss << ")";
-        // }
-        ss <<  UndoLogToString(&table_info->schema_, *undo_log);
-        fmt::println("{}", ss.str());
+        ss << fmt::format("  txn{}@{} ", undo_link->prev_txn_ ^ TXN_START_ID, undo_link->prev_log_idx_)
+           <<  UndoLogToString(&table_info->schema_, *undo_log)
+           << "\n";
         undo_link = undo_log->prev_version_;
         undo_log = txn_mgr->GetUndoLogOptional(undo_log->prev_version_);
       }
     }
+    ss << "----------------------------------------------\n";
     ++iter;
   }
+  fmt::println("{}", ss.str());
 
   // We recommend implementing this function as traversing the table heap and print the version chain. An example output
   // of our reference solution:
@@ -269,6 +260,7 @@ auto GetUndoLogSchema(const Schema *schema, const UndoLog &log, std::vector<uint
 
 auto UndoLogToString(const Schema *schema, const UndoLog &log) -> std::string {
   std::stringstream ss;
+  ss << fmt::format("ts={} ", log.ts_);
   if (log.is_deleted_) {
     ss << "<del>";
   } else {
@@ -294,7 +286,7 @@ auto UndoLogToString(const Schema *schema, const UndoLog &log) -> std::string {
     }
     ss << ")";
   }
-  return fmt::format("{} ts={}", ss.str(), GetReadableTs(log.ts_));
+  return ss.str();
 }
 
 
