@@ -63,8 +63,8 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
                              {txn->GetTransactionTempTs(), true}, base_tuple);
     } else {
       // Txn delete the tuple inserted by self
-      BUSTUB_ENSURE(!prev_link.has_value(), "it's impossible to delete a tuple twice!");
-      
+      // BUSTUB_ENSURE(!prev_link.has_value(), "it's impossible to delete a tuple twice!");
+      table_info_->table_->UpdateTupleMeta({txn->GetTransactionTempTs(), true}, *rid);
     }
     cnt++;
   }

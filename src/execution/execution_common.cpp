@@ -178,7 +178,7 @@ auto GetReadableTuple(const Schema *schema, const Tuple &base_tuple, const Tuple
     }
   }
 
-  return (txn->GetReadTs() >= base_meta.ts_ || txn->GetTransactionTempTs() == base_meta.ts_)
+  return ((txn->GetReadTs() >= base_meta.ts_ || txn->GetTransactionTempTs() == base_meta.ts_) && !base_meta.is_deleted_)
              ? std::make_optional(base_tuple)
              : std::nullopt;
 }
@@ -198,6 +198,10 @@ auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tup
                         UndoLink prev_version) -> UndoLog {
   if (target_tuple == nullptr) {
     return UndoLog{false, std::vector<bool>(schema->GetColumnCount(), true), *base_tuple, ts, prev_version};
+  }
+
+  if (base_tuple == nullptr) {
+    return UndoLog{true, {}, {}, 0, {}};
   }
 
   std::vector<bool> modified_fields(schema->GetColumnCount(), false);
@@ -229,6 +233,10 @@ auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tup
  */
 auto GenerateUpdatedUndoLog(const Schema *schema, const Tuple *base_tuple, const Tuple *target_tuple,
                             const UndoLog &log) -> UndoLog {
+  if (log.is_deleted_) {
+    // just case before task4.2
+    return log;
+  }
   uint32_t n = schema->GetColumnCount();
   std::vector<uint32_t> attrs;
   const auto schema_log = GetUndoLogSchema(schema, log, &attrs);
@@ -239,7 +247,7 @@ auto GenerateUpdatedUndoLog(const Schema *schema, const Tuple *base_tuple, const
     for (uint32_t i = 0, j = 0; i < n; ++i) {
       if (i == attrs[j]) {
         // read value from log
-        val_ptr[i] = log.tuple_.GetValue(&schema_log, i);
+        val_ptr[i] = log.tuple_.GetValue(&schema_log, j);
         ++j;
       } else {
         // read value from base_tuple
@@ -253,12 +261,12 @@ auto GenerateUpdatedUndoLog(const Schema *schema, const Tuple *base_tuple, const
     std::vector<bool> modified_fields(schema->GetColumnCount(), false);
     for (uint32_t i = 0, j = 0; i < n; i++) {
       if (j < attrs.size() && i == attrs[j]) {
-        // case: 两次修改可能抵消了
-        if (!log.tuple_.GetValue(&schema_log, j).CompareExactlyEquals(target_tuple->GetValue(schema, i))) {
-          new_attrs.push_back(i);
-          modified_fields[i] = true;
-          values.emplace_back(log.tuple_.GetValue(&schema_log, j));
-        }
+        // case: 两次修改可能抵消了 (case: 比如1->2->1, test要求生成undo_log {1})
+        // if (!log.tuple_.GetValue(&schema_log, j).CompareExactlyEquals(target_tuple->GetValue(schema, i))) {
+        new_attrs.push_back(i);
+        modified_fields[i] = true;
+        values.emplace_back(log.tuple_.GetValue(&schema_log, j));
+        // }
         ++j;
       } else if (!target_tuple->GetValue(schema, i).CompareExactlyEquals(base_tuple->GetValue(schema, i))) {
         new_attrs.push_back(i);
