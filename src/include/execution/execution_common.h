@@ -76,7 +76,12 @@ void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const Table
                TableHeap *table_heap);
 
 auto GetUndoLogSchema(const Schema *schema, const UndoLog &log, std::vector<uint32_t> *attrs) -> Schema;
+
 auto UndoLogToString(const Schema *schema, const UndoLog &log) -> std::string;
+
+inline auto IsConflict(Transaction *txn, timestamp_t ts) -> bool {
+  return !(txn->GetReadTs() >= ts || txn->GetTransactionTempTs() == ts);
+}
 
 // TODO(P4): Add new functions as needed... You are likely need to define some more functions.
 //

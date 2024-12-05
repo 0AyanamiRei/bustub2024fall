@@ -55,7 +55,7 @@ class ExecutionEngine {
                ExecutorContext *exec_ctx) -> bool {
     BUSTUB_ASSERT((txn == exec_ctx->GetTransaction()), "Broken Invariant");
 
-    // Construct the executor for the abstract plan node (根据不同类型选择构造)
+    // Construct the executor for the abstract plan node (自底向上调用节点的构造函数)
     auto executor = ExecutorFactory::CreateExecutor(exec_ctx, plan);
 
     // Initialize the executor

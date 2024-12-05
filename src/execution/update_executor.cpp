@@ -17,50 +17,86 @@ namespace bustub {
 
 UpdateExecutor::UpdateExecutor(ExecutorContext *exec_ctx, const UpdatePlanNode *plan,
                                std::unique_ptr<AbstractExecutor> &&child_executor)
-    : AbstractExecutor{exec_ctx}, 
+    : AbstractExecutor{exec_ctx},
       plan_{plan},
-      table_info_(exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_).get()),
+      table_info_{exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_).get()},
       child_executor_{std::move(child_executor)},
-      first_use_(true) {}
+      first_use_{true} {}
 
-void UpdateExecutor::Init() {}
+void UpdateExecutor::Init() {
+  // throw NotImplementedException("Update Node没有父节点, 不需要往下重启算子");
+}
 
-// 同样需要返回更新条数
-// 删除tuple->本地修改tuple->插入tuple
-auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
+auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   int32_t cnt = 0;
-  //  auto table_info_ = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_);
+  Tuple base_tuple;
   auto index_info_vec_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
+  auto txn = exec_ctx_->GetTransaction();
+  auto txn_mgr = exec_ctx_->GetTransactionManager();
+  auto &schema = child_executor_->GetOutputSchema();
 
-  while(child_executor_->Next(tuple, rid)) {
-    /**< 逻辑删除 (TODO) 考虑物理删除的时机 */
-    table_info_->table_->UpdateTupleMeta({0, true}, *rid);
-    /**< 从index 中删除 */
-    for(auto &index_info_ : index_info_vec_) {
+  while (child_executor_->Next(&base_tuple, rid)) {
+    // Check if needed to be aborted
+    auto base_ts = table_info_->table_->GetTupleMeta(base_tuple.GetRid()).ts_;
+    if (IsConflict(txn, base_ts)) {
+      txn->SetTainted();
+      throw ExecutionException("Write conflict during updating");
+    }
+
+    // delete (k,v) from index
+    for (auto &index_info_ : index_info_vec_) {
       auto &index_ = index_info_->index_;
-      index_->DeleteEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
-                          tuple->GetRid(), exec_ctx_->GetTransaction());
+      index_->DeleteEntry(base_tuple.KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
+                          base_tuple.GetRid(), exec_ctx_->GetTransaction());
     }
-    /**< 本地修改tuple */
+
+    // Created a new tuple from base_tuple and exprs
     std::vector<Value> values{};
-    values.reserve(child_executor_->GetOutputSchema().GetColumnCount());
-    for(auto &expr : plan_->target_expressions_) {
-      values.push_back(expr->Evaluate(tuple, child_executor_->GetOutputSchema()));
+    values.reserve(schema.GetColumnCount());
+    for (auto &expr : plan_->target_expressions_) {
+      values.push_back(expr->Evaluate(&base_tuple, schema));
     }
-    *tuple = Tuple{values, &child_executor_->GetOutputSchema()};
-    /**< 插入tuple */
-    tuple->SetRid(table_info_->table_->InsertTuple({0, false}, *tuple, nullptr, nullptr, plan_->table_oid_).value());
-    /**< 更新index */
-    for(auto &index_info_ : index_info_vec_) {
+    *tuple = Tuple(values, &schema);
+    tuple->SetRid(*rid);
+
+    // Insert new (k,v) into index
+    for (auto &index_info_ : index_info_vec_) {
       auto &index_ = index_info_->index_;
       index_->InsertEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
-                          tuple->GetRid(), exec_ctx_->GetTransaction());
+                          *rid, txn);
     }
-    /**< 更新rows计数 */
+
+    // Updated tuple & updated version chain
+    auto write_set = txn->GetWriteSets();
+    auto iter = write_set[plan_->table_oid_].find(*rid);
+    auto prev_link = txn_mgr->GetUndoLink(*rid);
+    if (iter == write_set[plan_->table_oid_].end()) {
+      // Txn first update the tuple
+      txn->AppendWriteSet(plan_->table_oid_, *rid);
+      auto undo_log =
+          GenerateNewUndoLog(&schema, &base_tuple, tuple, base_ts, prev_link.has_value() ? *prev_link : UndoLink{});
+      auto undo_link = txn->AppendUndoLog(undo_log);
+      UpdateTupleAndUndoLink(txn_mgr, *rid, undo_link, table_info_->table_.get(), txn,
+                             {txn->GetTransactionTempTs(), false}, *tuple);
+    } else {
+      // Txn isn't first write the tuple
+      if (prev_link.has_value()) {
+        auto undo_log = GenerateUpdatedUndoLog(&schema, &base_tuple, tuple, txn_mgr->GetUndoLog(*prev_link));
+        txn->ModifyUndoLog(prev_link->prev_log_idx_, undo_log);
+      }
+      // The tuple inserted by self, not need to create undo_log
+      table_info_->table_->UpdateTupleInPlace({txn->GetTransactionTempTs(), false}, *tuple, *rid);
+    }
+
+    // count
     cnt++;
   }
-  *tuple = Tuple({{TypeId::INTEGER, cnt}}, &GetOutputSchema()); /**< 返回更新rows的数量 */
-  if(first_use_) {
+
+  // Now all tuple had been updated
+  *tuple = Tuple({{TypeId::INTEGER, cnt}}, &GetOutputSchema());
+
+  // travel handle
+  if (first_use_) {
     first_use_ = false;
     return true;
   } else {

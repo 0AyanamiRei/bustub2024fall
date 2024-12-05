@@ -368,6 +368,8 @@ TEST(TxnScanTest, ScanTest) {  // NOLINT
     ASSERT_EQ(txn_store_2->GetCommitTs(), 2);
   }
 
+  TxnMgrDbg("ck1", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
+  
   auto txn2 = bustub->txn_manager_->Begin();
   ASSERT_EQ(txn2->GetReadTs(), 2);
 
@@ -469,7 +471,6 @@ RID=1/3 ts=6* <del>
 
   query = "SELECT a FROM maintable";
   fmt::println(stderr, "C: Verify txn2");
-  // r0 2, r3 6
   WithTxn(txn2, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {6}})); // <- you will need to fill in the answer
   fmt::println(stderr, "D: Verify txn3");
   WithTxn(txn3, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {3}, {5}})); // <- you will need to fill in the answer

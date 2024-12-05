@@ -20,6 +20,7 @@
 
 #include "catalog/catalog.h"
 #include "concurrency/transaction.h"
+#include "concurrency/transaction_manager.h"
 #include "execution/check_options.h"
 #include "execution/executors/abstract_executor.h"
 #include "storage/page/tmp_tuple_page.h"
@@ -57,42 +58,42 @@ class ExecutorContext {
   DISALLOW_COPY_AND_MOVE(ExecutorContext);
 
   /** @return the running transaction */
-  auto GetTransaction() const -> Transaction * { return transaction_; }
+  inline auto GetTransaction() const -> Transaction * { return transaction_; }
 
   /** @return the catalog */
-  auto GetCatalog() -> Catalog * { return catalog_; }
+  inline auto GetCatalog() -> Catalog * { return catalog_; }
 
   /** @return the buffer pool manager */
-  auto GetBufferPoolManager() -> BufferPoolManager * { return bpm_; }
+  inline auto GetBufferPoolManager() -> BufferPoolManager * { return bpm_; }
 
   /** @return the log manager - don't worry about it for now */
-  auto GetLogManager() -> LogManager * { return nullptr; }
+  inline auto GetLogManager() -> LogManager * { return nullptr; }
 
   /** @return the lock manager */
-  auto GetLockManager() -> LockManager * { return lock_mgr_; }
+  inline auto GetLockManager() -> LockManager * { return lock_mgr_; }
 
   /** @return the transaction manager */
-  auto GetTransactionManager() -> TransactionManager * { return txn_mgr_; }
+  inline auto GetTransactionManager() -> TransactionManager * { return txn_mgr_; }
 
   /** @return the set of nlj check executors */
-  auto GetNLJCheckExecutorSet() -> std::deque<std::pair<AbstractExecutor *, AbstractExecutor *>> & {
+  inline auto GetNLJCheckExecutorSet() -> std::deque<std::pair<AbstractExecutor *, AbstractExecutor *>> & {
     return nlj_check_exec_set_;
   }
 
   /** @return the check options */
-  auto GetCheckOptions() -> std::shared_ptr<CheckOptions> { return check_options_; }
+  inline auto GetCheckOptions() -> std::shared_ptr<CheckOptions> { return check_options_; }
 
-  void AddCheckExecutor(AbstractExecutor *left_exec, AbstractExecutor *right_exec) {
+  inline void AddCheckExecutor(AbstractExecutor *left_exec, AbstractExecutor *right_exec) {
     nlj_check_exec_set_.emplace_back(left_exec, right_exec);
   }
 
-  void InitCheckOptions(std::shared_ptr<CheckOptions> &&check_options) {
+  inline void InitCheckOptions(std::shared_ptr<CheckOptions> &&check_options) {
     BUSTUB_ASSERT(check_options, "nullptr");
     check_options_ = std::move(check_options);
   }
 
   /** As of Fall 2023, this function should not be used. */
-  auto IsDelete() const -> bool { return is_delete_; }
+  inline auto IsDelete() const -> bool { return is_delete_; }
 
  private:
   /** The transaction context associated with this executor context */

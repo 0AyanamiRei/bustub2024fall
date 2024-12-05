@@ -93,8 +93,7 @@ class TransactionManager {
   struct PageVersionInfo {
     /** protects the map */
     std::shared_mutex mutex_;
-    /** Stores previous version info for all slots. Note: DO NOT use `[x]` to access it because
-     * it will create new elements even if it does not exist. Use `find` instead.
+    /** Stores previous version info for all slots.
      */
     std::unordered_map<slot_offset_t, UndoLink> prev_link_;
   };

@@ -31,6 +31,7 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
                                  exec_ctx_->GetTransactionManager());
     ++(*iter_.get());
     if(t.has_value()) {
+      // Otherwise, t is std::nullopt means the tuple did not exist at this time
       *tuple = *t;
       *rid = tuple->GetRid();
       if(plan_->filter_predicate_) {

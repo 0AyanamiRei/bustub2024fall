@@ -70,16 +70,18 @@ struct UndoLink {
   auto IsValid() const -> bool { return prev_txn_ != INVALID_TXN_ID; }
 };
 
+/**
+ * - `is_deleted_`: Whether this log is a deletion marker
+ * - `modified_fields_`: The fields modified by this undo log
+ * - `tuple_`: The modified fields, delta data
+ * - `ts_`: Timestamp of this undo log
+ * - `prev_version_`: Undo log prev version
+*/
 struct UndoLog {
-  /* Whether this log is a deletion marker */
   bool is_deleted_;
-  /* The fields modified by this undo log */
   std::vector<bool> modified_fields_; // C++: std::vector<bool>偏特化的实现, 需要特别注意 
-  /* The modified fields */
   Tuple tuple_;
-  /* Timestamp of this undo log */
   timestamp_t ts_{INVALID_TS};
-  /* Undo log prev version */
   UndoLink prev_version_{};
 };
 

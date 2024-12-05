@@ -27,16 +27,44 @@ void DeleteExecutor::Init() {}
 
 auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   int32_t cnt = 0;
+  Tuple base_tuple;
   auto table_info_ = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_);
   auto index_info_vec_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
+  auto txn = exec_ctx_->GetTransaction();
+  auto txn_mgr = exec_ctx_->GetTransactionManager();
+  auto &schema = child_executor_->GetOutputSchema();
 
-  while(child_executor_->Next(tuple, rid)) {
-    table_info_->table_->UpdateTupleMeta({0, true}, *rid);
-    /**< 修改相关Index */
+  while(child_executor_->Next(&base_tuple, rid)) {
+    // Check if needed to be aborted
+    auto base_ts = table_info_->table_->GetTupleMeta(base_tuple.GetRid()).ts_;
+    if (IsConflict(txn, base_ts)) {
+      txn->SetTainted();
+      throw ExecutionException("Write conflict during deleting");
+    }
+    // delete (k,v) from index
     for(auto &index_info_ : index_info_vec_) {
       auto &index_ = index_info_->index_;
       index_->DeleteEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
                           tuple->GetRid(), exec_ctx_->GetTransaction());
+    }
+
+    // Updated tuple & updated version chain
+    auto write_set = txn->GetWriteSets();
+    auto iter = write_set[plan_->table_oid_].find(*rid);
+    auto prev_link = txn_mgr->GetUndoLink(*rid);
+    if (iter == write_set[plan_->table_oid_].end()) {
+      // Txn first update the tuple
+      txn->AppendWriteSet(plan_->table_oid_, *rid);
+      auto undo_log =
+          GenerateNewUndoLog(&schema, &base_tuple, nullptr, base_ts, prev_link.has_value() ? *prev_link : UndoLink{});
+      auto undo_link = txn->AppendUndoLog(undo_log);
+      // here pass the base_tuple just ok, we just need update the metada.is_deleted_ to true
+      UpdateTupleAndUndoLink(txn_mgr, *rid, undo_link, table_info_->table_.get(), txn,
+                             {txn->GetTransactionTempTs(), true}, base_tuple);
+    } else {
+      // Txn delete the tuple inserted by self
+      BUSTUB_ENSURE(!prev_link.has_value(), "it's impossible to delete a tuple twice!");
+      
     }
     cnt++;
   }

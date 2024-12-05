@@ -19,6 +19,7 @@
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/delete_plan.h"
+#include "execution/execution_common.h"
 #include "storage/table/tuple.h"
 
 namespace bustub {

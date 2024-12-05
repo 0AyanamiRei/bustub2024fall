@@ -56,6 +56,7 @@ auto TransactionManager::UpdateUndoLink(RID rid, std::optional<UndoLink> prev_li
   return true;
 }
 
+/** two case return `std::nullopt` */
 auto TransactionManager::GetUndoLink(RID rid) -> std::optional<UndoLink> {
   std::shared_lock<std::shared_mutex> lck(version_info_mutex_);
   auto iter = version_info_.find(rid.GetPageId());
