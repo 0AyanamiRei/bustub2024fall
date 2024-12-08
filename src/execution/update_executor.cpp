@@ -27,6 +27,7 @@ void UpdateExecutor::Init() {
   // throw NotImplementedException("Update Node没有父节点, 不需要往下重启算子");
 }
 
+/** (FIX ?)update中的undo_log应该加入 */
 auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   int32_t cnt = 0;
   Tuple base_tuple;

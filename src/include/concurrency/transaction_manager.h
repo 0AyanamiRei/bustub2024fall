@@ -85,6 +85,11 @@ class TransactionManager {
    * heap. */
   void GarbageCollection();
 
+  /** @brief delete this version chain from (undo_link)-> `undo_log` to end
+   * delete it from txn's undo_logs_, too
+  */
+void WalkUndoLogAndClear(UndoLink undo_link, std::unordered_map<txn_id_t, uint32_t> &delete_count);
+
   /** protects txn map */
   std::shared_mutex txn_map_mutex_;
   /** All transactions, running or committed */
@@ -93,8 +98,7 @@ class TransactionManager {
   struct PageVersionInfo {
     /** protects the map */
     std::shared_mutex mutex_;
-    /** Stores previous version info for all slots.
-     */
+    /** Stores previous version info for all slots. */
     std::unordered_map<slot_offset_t, UndoLink> prev_link_;
   };
 
@@ -119,7 +123,6 @@ class TransactionManager {
   Catalog *catalog_;
 
   std::atomic<txn_id_t> next_txn_id_{TXN_START_ID};
-  
 
  private:
   /** @brief Verify if a txn satisfies serializability. We will not test this function and you can change / remove it as
