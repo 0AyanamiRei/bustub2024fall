@@ -110,15 +110,18 @@ void TransactionManager::Abort(Transaction *txn) {
  * 1. ts < water_mark
  * 2. 不是version中最后一个undo_log (遍历version chain时的终止条件是找到第一个read-ts>=ts)
  *
+ * (FIX) water_mark > tuple's ts (which in the table_heap) drop all undo_logs
  */
 void TransactionManager::GarbageCollection() {
   auto water_mark = running_txns_.GetWatermark();
+  LOG_INFO("water_mark:%ld", water_mark);
   std::unordered_map<txn_id_t, uint32_t> delete_count;
   // Traverse the table heap and the version chain
   // std::unique_lock<std::shared_mutex> l(version_info_mutex_); // don't need to
   for (auto &[page_id, prevs] : version_info_) {
-    for (auto &[slot, undo_link] : prevs->prev_link_) {
+    for (auto [slot, undo_link] : prevs->prev_link_) {
       // RID rid{page_id, slot};
+
       auto undo_log_opt = GetUndoLogOptional(undo_link);
       int log_num = 0;
       while (undo_log_opt.has_value()) {
@@ -135,15 +138,29 @@ void TransactionManager::GarbageCollection() {
   }
 
   // std::unique_lock<std::shared_mutex> l(txn_map_mutex_); // don't need to
-  for (auto &[txn_id, cnt] : delete_count) {
-    auto txn = txn_map_[txn_id];
-    if (txn->GetTransactionState() != TransactionState::RUNNING) {
-      if (delete_count[txn_id] == txn->undo_logs_.size()) {
-        LOG_INFO("delete txn%ld", txn->GetTransactionIdHumanReadable());
-        txn_map_.erase(txn_id);
+  for (auto iter = txn_map_.begin(); iter != txn_map_.end();) {
+    auto &[txn_id, txn] = *iter;
+    if (txn->GetTransactionState() == TransactionState::ABORTED ||
+        txn->GetTransactionState() == TransactionState::COMMITTED) {
+      if (txn->undo_logs_.size() == 0U || water_mark > txn->commit_ts_.load() ||
+          delete_count[txn_id] == txn->undo_logs_.size()) {
+        std::cout << "delete txn" << txn->GetTransactionIdHumanReadable() << " " << txn_id << std::endl;
+        iter = txn_map_.erase(iter);
+        continue;
       }
     }
+    ++iter;
   }
+
+  // for (auto [txn_id, cnt] : delete_count) {
+  //   auto txn = txn_map_[txn_id];
+  //   if (txn->GetTransactionState() != TransactionState::RUNNING) {
+  //     if (delete_count[txn_id] == txn->undo_logs_.size()) {
+  //       std::cout << "delete txn" << txn->GetTransactionIdHumanReadable() << " " << txn_id << std::endl;
+  //       txn_map_.erase(txn_id);
+  //     }
+  //   }
+  // }
 }
 
 void TransactionManager::WalkUndoLogAndClear(UndoLink undo_link, std::unordered_map<txn_id_t, uint32_t> &delete_count) {
