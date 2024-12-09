@@ -102,68 +102,25 @@ void TransactionManager::Abort(Transaction *txn) {
   running_txns_.RemoveTxn(txn->read_ts_);
 }
 
-/**
- * @brief this is a Stop-the-world Garbage Collection function
- *
- * 删除对所有事务不可见的undo_log, 即在read-ts=water_mark的txn视角下不可见
- * 具体来说是同时满足以下条件:
- * 1. ts < water_mark
- * 2. 不是version中最后一个undo_log (遍历version chain时的终止条件是找到第一个read-ts>=ts)
- *
- * (FIX) water_mark > tuple's ts (which in the table_heap) drop all undo_logs
- */
+///! this is a Stop-the-world Garbage Collection function
+///! so you don't need to get any locks
 void TransactionManager::GarbageCollection() {
   auto water_mark = running_txns_.GetWatermark();
-  LOG_INFO("water_mark:%ld", water_mark);
-  std::unordered_map<txn_id_t, uint32_t> delete_count;
-  // Traverse the table heap and the version chain
-  // std::unique_lock<std::shared_mutex> l(version_info_mutex_); // don't need to
-  for (auto &[page_id, prevs] : version_info_) {
-    for (auto [slot, undo_link] : prevs->prev_link_) {
-      // RID rid{page_id, slot};
 
-      auto undo_log_opt = GetUndoLogOptional(undo_link);
-      int log_num = 0;
-      while (undo_log_opt.has_value()) {
-        log_num++;
-        if (water_mark > undo_log_opt->ts_ && log_num > 1) {
-          // we delete the undo_log from here: --(undo_link)--> undo_log
-          WalkUndoLogAndClear(undo_link, delete_count);
-          break;
-        }
-        undo_link = undo_log_opt->prev_version_;
-        undo_log_opt = GetUndoLogOptional(undo_log_opt->prev_version_);
-      }
-    }
-  }
-
-  // std::unique_lock<std::shared_mutex> l(txn_map_mutex_); // don't need to
   for (auto iter = txn_map_.begin(); iter != txn_map_.end();) {
     auto &[txn_id, txn] = *iter;
-    if (txn->GetTransactionState() == TransactionState::ABORTED ||
-        txn->GetTransactionState() == TransactionState::COMMITTED) {
-      if (txn->undo_logs_.size() == 0U || water_mark > txn->commit_ts_.load() ||
-          delete_count[txn_id] == txn->undo_logs_.size()) {
-        std::cout << "delete txn" << txn->GetTransactionIdHumanReadable() << " " << txn_id << std::endl;
+    auto state = txn->GetTransactionState();
+    if (state == TransactionState::ABORTED || state == TransactionState::COMMITTED) {
+      if (txn->undo_logs_.size() == 0U || water_mark > txn->commit_ts_.load()) {
         iter = txn_map_.erase(iter);
         continue;
       }
     }
     ++iter;
   }
-
-  // for (auto [txn_id, cnt] : delete_count) {
-  //   auto txn = txn_map_[txn_id];
-  //   if (txn->GetTransactionState() != TransactionState::RUNNING) {
-  //     if (delete_count[txn_id] == txn->undo_logs_.size()) {
-  //       std::cout << "delete txn" << txn->GetTransactionIdHumanReadable() << " " << txn_id << std::endl;
-  //       txn_map_.erase(txn_id);
-  //     }
-  //   }
-  // }
 }
 
-void TransactionManager::WalkUndoLogAndClear(UndoLink undo_link, std::unordered_map<txn_id_t, uint32_t> &delete_count) {
+void TransactionManager::WalkChain(UndoLink undo_link, std::unordered_map<txn_id_t, uint32_t> &delete_count) {
   while (undo_link.IsValid()) {
     auto txn = txn_map_[undo_link.prev_txn_];
     auto undo_log = txn->undo_logs_[undo_link.prev_log_idx_];
@@ -173,8 +130,78 @@ void TransactionManager::WalkUndoLogAndClear(UndoLink undo_link, std::unordered_
       delete_count[undo_link.prev_txn_] = 1;
     }
     undo_link = undo_log.prev_version_;
-    // txn->undo_logs_[undo_link.prev_log_idx_] = {};
   }
 }
 
+void TransactionManager::GarbageCollection(BufferPoolManager *bpm_) {
+  throw NotImplementedException("Not implement this function, need to complete");
+  auto water_mark = running_txns_.GetWatermark();
+  std::unordered_map<txn_id_t, uint32_t> delete_count;
+
+  // Traverse the version chain and clear useless undo logs
+  for (auto &[page_id, prevs] : version_info_) {
+    auto page_guard = bpm_->ReadPage(page_id);
+    auto page = page_guard.As<TablePage>();
+    for (auto iter = prevs->prev_link_.begin(); iter != prevs->prev_link_.end();) {
+      auto [slot, undo_link] = *iter;
+      RID rid{page_id, static_cast<uint32_t>(slot)};
+      auto meta = page->GetTupleMeta(rid);
+
+      // delete all version chain
+      if (meta.ts_ <= water_mark) {
+        iter = prevs->prev_link_.erase(iter);
+        continue;
+      }
+
+      // cut off part of the version chain
+      int log_num = 0;
+      auto undo_log_opt = GetUndoLogOptional(undo_link);
+      while (undo_log_opt.has_value()) {
+        log_num++;
+        if (water_mark > undo_log_opt->ts_ && log_num > 1) {
+          // WalkChainAndClear(undo_link, delete_count);
+          break;
+        }
+        undo_link = undo_log_opt->prev_version_;
+        undo_log_opt = GetUndoLogOptional(undo_log_opt->prev_version_);
+      }
+
+      ++iter;
+    }
+  }
+
+  // Traverse the txn_map_, remove it if its undo_logs is empty
+  for (auto iter = txn_map_.begin(); iter != txn_map_.end();) {
+    auto &[txn_id, txn] = *iter;
+    auto state = txn->GetTransactionState();
+    if (state == TransactionState::ABORTED || state == TransactionState::COMMITTED) {
+      if (txn->undo_logs_.size() == 0U || txn->undo_logs_.size() == delete_count[txn_id]) {
+        iter = txn_map_.erase(iter);
+        continue;
+      }
+    }
+    ++iter;
+  }
+}
+
+void TransactionManager::WalkChainAndClear(RID rid, std::unordered_map<txn_id_t, uint32_t> &delete_count) {
+  throw NotImplementedException("Not implement this function");
+}
+
 }  // namespace bustub
+
+/**
+ * @details about GC
+ * 
+ * gc需要删除对所有事务不可见的undo_logs, 系统维护一个最低read-ts的水准线: `water_mark`
+ * bustub中的gc仅仅将txn从txn_mgr的`txn_map_`中移除, 不需要相应地修改undo_logs.
+ * 
+ * bustub每个事务
+ * 
+ * 
+ * 1. ts < water_mark
+ * 2. 不是version中最后一个undo_log (遍历version chain时的终止条件是找到第一个read-ts>=ts)
+ *
+ * (FIX) case : `water_mark > tuple's ts` (which in the table_heap) drop all undo_logs
+ * if `water_mark > txn->commit_ts_.load()` we drop this txn can cover the case
+*/

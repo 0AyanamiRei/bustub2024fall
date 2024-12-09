@@ -48,7 +48,7 @@ auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     for (auto &index_info_ : index_info_vec_) {
       auto &index_ = index_info_->index_;
       index_->DeleteEntry(base_tuple.KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
-                          base_tuple.GetRid(), exec_ctx_->GetTransaction());
+                          *rid, txn);
     }
 
     // Created a new tuple from base_tuple and exprs

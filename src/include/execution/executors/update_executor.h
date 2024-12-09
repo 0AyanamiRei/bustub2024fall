@@ -35,6 +35,8 @@
  * (TODO)
  * 目前的实现暂时没有在本地存储所有tuples再更新, 但依旧要等待所有tuples
  * 更新完后才会结束一轮Next()
+ * 
+ * 目前的做法存在Halloween problem
 ******************************************/
 
 namespace bustub {

@@ -261,12 +261,10 @@ auto GenerateUpdatedUndoLog(const Schema *schema, const Tuple *base_tuple, const
     std::vector<bool> modified_fields(schema->GetColumnCount(), false);
     for (uint32_t i = 0, j = 0; i < n; i++) {
       if (j < attrs.size() && i == attrs[j]) {
-        // case: 两次修改可能抵消了 (case: 比如1->2->1, test要求生成undo_log {1})
-        // if (!log.tuple_.GetValue(&schema_log, j).CompareExactlyEquals(target_tuple->GetValue(schema, i))) {
+        // case: 如果两次修改类似于1->2->1, 测试要求仍旧生成undo_log {1}
         new_attrs.push_back(i);
         modified_fields[i] = true;
         values.emplace_back(log.tuple_.GetValue(&schema_log, j));
-        // }
         ++j;
       } else if (!target_tuple->GetValue(schema, i).CompareExactlyEquals(base_tuple->GetValue(schema, i))) {
         new_attrs.push_back(i);

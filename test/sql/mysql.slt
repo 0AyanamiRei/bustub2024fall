@@ -20,40 +20,18 @@
 ./bin/bustub-sqllogictest ../test/sql/p3.05-index-scan-btree.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.04-delete.slt --verbose 
 ./bin/bustub-sqllogictest ../test/sql/p3.03-update.slt --verbose 
-./bin/bustub-sqllogictest ../test/sql/p3.02-insert.slt --verbose 
-./bin/bustub-sqllogictest ../test/sql/p3.01-seqscan.slt --verbose 
+./bin/bustub-sqllogictest ../test/sql/p3.02-insert.slt --verbose
+./bin/bustub-sqllogictest ../test/sql/p3.01-seqscan.slt --verbose
 
 
-CREATE TABLE t1(a int, b double, c int);
-BEGIN;
-\txn -1
-BEGIN;
-COMMIT;
-BEGIN;
-\txn -1
-BEGIN;
-INSERT INTO t1 VALUES (4, 4.0, 1);
-INSERT INTO t1 VALUES (7);
-COMMIT;
 
-BEGIN;
-\txn -1
-BEGIN;
-delete from t1 where a = 4;
-COMMIT;
 
-BEGIN;
-\txn -1
-BEGIN;
-update t1 set a = 6 where a = 7;
-COMMIT;
-
-BEGIN;
-\txn -1
-BEGIN;
-COMMIT;
-
-BEGIN;
-\txn -1
-BEGIN;
-
+set force_optimizer_starter_rule=yes;
+create table t1(v1 int, v2 int, v3 int);
+insert into t1 values (1, 50, 645), (2, 40, 721), (4, 20, 445), (5, 10, 445), (3, 30, 645);
+create index t1v1 on t1(v1);
+create index t1v2 on t1(v2);
+insert into t1 values (6, 0, 721), (7, -10, 645);
+update t1 set v3 = 645, v1 = 8, v2 = -20 where v1 = 2;
+update t1 set v1 = 2 where v1 = 8;
+delete from t1 where v1 = 2;

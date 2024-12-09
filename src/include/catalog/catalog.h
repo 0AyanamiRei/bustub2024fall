@@ -204,14 +204,7 @@ class Catalog {
   auto CreateIndex(Transaction *txn, const std::string &index_name, const std::string &table_name, const Schema &schema,
                    const Schema &key_schema, const std::vector<uint32_t> &key_attrs, std::size_t keysize,
                    HashFunction<KeyType> hash_function, bool is_primary_key = false,
-                   IndexType index_type = IndexType::BPlusTreeIndex) -> std::shared_ptr<IndexInfo> {
-    
-    // DEBUG
-    // std::cout << index_name << std::endl << table_name << std::endl;
-    // auto a = key_schema;
-    // auto b = schema;
-    // auto c = key_attrs;
-    
+                   IndexType index_type = IndexType::BPlusTreeIndex) -> std::shared_ptr<IndexInfo> {    
     // Reject the creation request for nonexistent table
     if (table_names_.find(table_name) == table_names_.end()) {
       return NULL_INDEX_INFO;
