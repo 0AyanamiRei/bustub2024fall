@@ -79,6 +79,16 @@ auto GetUndoLogSchema(const Schema *schema, const UndoLog &log, std::vector<uint
 
 auto UndoLogToString(const Schema *schema, const UndoLog &log) -> std::string;
 
+/** @brief check if w-w conflict, case explain:
+ * 
+ * More conservative than `First-Committer-Wins`,
+ * returns false whenever another transaction
+ * modifies the contents of the tuple.
+ * 
+ * @note - case `read-ts < ts` is follow the First-Committer-Wins Strategy
+ * @note - case `txn_id_ != ts` indicate the tuple modified by a un-commit txn
+ *         we still return false
+*/
 inline auto IsConflict(Transaction *txn, timestamp_t ts) -> bool {
   return !(txn->GetReadTs() >= ts || txn->GetTransactionTempTs() == ts);
 }

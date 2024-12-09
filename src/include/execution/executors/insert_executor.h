@@ -50,7 +50,7 @@ class InsertExecutor : public AbstractExecutor {
    * NOTE: InsertExecutor::Next() does not use the `rid` out-parameter.
    * NOTE: InsertExecutor::Next() returns true with number of inserted rows produced only once.
    */
-  auto Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool override;
+  auto Next(Tuple *tuple, RID *rid) -> bool override;
 
   /** @return The output schema for the insert */
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); };

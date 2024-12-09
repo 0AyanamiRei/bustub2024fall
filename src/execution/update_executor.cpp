@@ -37,7 +37,11 @@ auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   auto &schema = child_executor_->GetOutputSchema();
 
   while (child_executor_->Next(&base_tuple, rid)) {
-    // Check if needed to be aborted
+    // Check conflict in update executor
+    // @explain
+    // Here, if IsConflict() return true shows
+    // the base_tuple was modified by other txn,
+    // no matter it commits or not.
     auto base_ts = table_info_->table_->GetTupleMeta(base_tuple.GetRid()).ts_;
     if (IsConflict(txn, base_ts)) {
       txn->SetTainted();

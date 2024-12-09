@@ -39,7 +39,7 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 
   while (child_executor_->Next(tuple, rid)) {
     // primary key check
-    if (pkey_index != nullptr) {
+    if (pkey_index_info != nullptr) {
       if (std::vector<bustub::RID> result{};
           pkey_index->ScanKey(
               tuple->KeyFromTuple(table_info->schema_, *pkey_index->GetKeySchema(), pkey_index->GetKeyAttrs()), &result,
@@ -64,6 +64,14 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
           !index->InsertEntry(tuple->KeyFromTuple(table_info->schema_, *index->GetKeySchema(), index->GetKeyAttrs()),
                               tuple->GetRid(), exec_ctx_->GetTransaction()) &&
           index_info->is_primary_key_) {
+        // Maybe useful, before throw exception
+        {
+          auto write_set = txn->GetWriteSets();
+          for (auto &rid_dirty : write_set[table_info->oid_]) {
+            table_info->table_->UpdateTupleMeta({txn->GetTransactionTempTs(), true}, rid_dirty);
+          }
+        }
+        // 
         txn->SetTainted();
         throw ExecutionException("Repeated insertion of the same primary key");
       }
