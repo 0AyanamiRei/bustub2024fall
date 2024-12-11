@@ -16,11 +16,12 @@
 #include <utility>
 #include <vector>
 
+#include "execution/execution_common.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/expressions/column_value_expression.h"
 #include "execution/plans/update_plan.h"
-#include "execution/execution_common.h"
+
 #include "storage/table/tuple.h"
 #include "type/value_factory.h"
 
@@ -28,17 +29,17 @@
  * @attention
  * p4-3.4 Update & Delete Executor 提示
  * Your update executor should be implemented as a pipeline breaker.
- * 
- * Pipeline Breaker: 
+ *
+ * Pipeline Breaker:
  * first store all tuples from the child executor to a local
  * buffer before writing any updates.
- * 
+ *
  * (TODO)
  * 目前的实现暂时没有在本地存储所有tuples再更新, 但依旧要等待所有tuples
  * 更新完后才会结束一轮Next()
- * 
+ *
  * 目前的做法存在Halloween problem
-******************************************/
+ ******************************************/
 
 namespace bustub {
 
@@ -76,10 +77,9 @@ class UpdateExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 
  private:
-  const UpdatePlanNode *plan_; /** The update plan node to be executed */
-  const TableInfo *table_info_; /** Metadata identifying the table that should be updated */
+  const UpdatePlanNode *plan_;                       /** The update plan node to be executed */
+  const TableInfo *table_info_;                      /** Metadata identifying the table that should be updated */
   std::unique_ptr<AbstractExecutor> child_executor_; /** The child executor to obtain value from */
-  bool first_use_;
   std::vector<Tuple> tuple_buffer;
 };
 }  // namespace bustub

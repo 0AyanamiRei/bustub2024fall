@@ -37,21 +37,15 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   while(child_executor_->Next(&base_tuple, rid)) {
     // Check conflict in update executor
     // @explain
-    // Here, if IsConflict() return true shows
+    // Here, if CheckConflict_1() return true shows
     // the base_tuple was deleted by other txn,
     // no matter it commits or not.
     auto base_ts = table_info_->table_->GetTupleMeta(base_tuple.GetRid()).ts_;
-    if (IsConflict(txn, base_ts)) {
+        
+    if (CheckConflict_1(txn, base_ts)) {
       txn->SetTainted();
       throw ExecutionException("Write conflict during deleting");
     }
-
-    // delete (k,v) from index
-    // for(auto &index_info_ : index_info_vec_) {
-    //   auto &index_ = index_info_->index_;
-    //   index_->DeleteEntry(base_tuple.KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
-    //                       *rid, txn);
-    // }
 
     // Updated tuple & updated version chain
     auto write_set = txn->GetWriteSets();
@@ -65,7 +59,7 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
       auto undo_link = txn->AppendUndoLog(undo_log);
       // here pass the base_tuple just ok, we just need update the metada.is_deleted_ to true
       UpdateTupleAndUndoLink(txn_mgr, *rid, undo_link, table_info_->table_.get(), txn,
-                             {txn->GetTransactionTempTs(), true}, base_tuple);
+                             {txn->GetTransactionTempTs(), true}, base_tuple, CheckConflict_2);
     } else {
       // Txn delete the tuple inserted by self
       table_info_->table_->UpdateTupleMeta({txn->GetTransactionTempTs(), true}, *rid);

@@ -30,9 +30,7 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   auto table_info = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_);
   auto index_info_vec = exec_ctx_->GetCatalog()->GetTableIndexes(table_info->name_);
   auto txn = exec_ctx_->GetTransaction();
-  auto pkey_index_iter =
-      std::find_if(index_info_vec.begin(), index_info_vec.end(),
-                   [](const std::shared_ptr<bustub::IndexInfo> &index_info) { return index_info->is_primary_key_; });
+  auto pkey_index_iter = std::find_if(index_info_vec.begin(), index_info_vec.end(), IsPkeyIndex);
   std::shared_ptr<bustub::IndexInfo> pkey_index_info =
       (pkey_index_iter != index_info_vec.end()) ? *pkey_index_iter : nullptr;
   auto &pkey_index = pkey_index_info->index_;
@@ -41,35 +39,41 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   // and thus we do not need to maintain secondary indexes in out code.
 
   while (child_executor_->Next(tuple, rid)) {
-    // primary key check
     if (pkey_index_info != nullptr) {
       std::vector<bustub::RID> result{};
       pkey_index->ScanKey(
           tuple->KeyFromTuple(table_info->schema_, *pkey_index->GetKeySchema(), pkey_index->GetKeyAttrs()), &result,
           txn);
+      // Repeat insert
       if (!result.empty()) {
         tuple->SetRid(result[0]);
         *rid = result[0];
-        if (auto [base_meta, base_tuple] = table_info->table_->GetTuple(tuple->GetRid()); base_meta.is_deleted_) {
+        auto txn_mgr = exec_ctx_->GetTransactionManager();
+        if (auto [base_meta, base_tuple, prev_link] = GetTupleAndUndoLink(txn_mgr, table_info->table_.get(), *rid);
+            base_meta.is_deleted_) {
+          // 原子获取`base_tuple`和`prev_link`
+          // 直到txn为该tuple打上临时时间戳标记前 不保证其不会被其他txn更新,
+          // 因此需要在实际修改时检查这期间有无其他txn修改该tuple
+
           // insert into tomb tuple: do what you do in update executor
           // Updated tuple & updated version chain
-          auto table_info = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_).get();
-          auto base_ts = table_info->table_->GetTupleMeta(base_tuple.GetRid()).ts_;
-          auto txn_mgr = exec_ctx_->GetTransactionManager();
           auto write_set = txn->GetWriteSets();
           auto iter = write_set[plan_->table_oid_].find(*rid);
-          auto prev_link = txn_mgr->GetUndoLink(*rid);
           if (iter == write_set[plan_->table_oid_].end()) {
             // Txn first update the tuple
             txn->AppendWriteSet(plan_->table_oid_, *rid);
-            auto undo_log = GenerateNewUndoLog(&child_executor_->GetOutputSchema(), nullptr, tuple, base_ts,
+            auto undo_log = GenerateNewUndoLog(&child_executor_->GetOutputSchema(), nullptr, tuple,
+                                               table_info->table_->GetTupleMeta(base_tuple.GetRid()).ts_,
                                                prev_link.has_value() ? *prev_link : UndoLink{});
-            auto undo_link =
-                txn->AppendUndoLog(undo_log);
+            auto undo_link = txn->AppendUndoLog(undo_log);
             UpdateTupleAndUndoLink(txn_mgr, *rid, undo_link, table_info->table_.get(), txn,
-                                   {txn->GetTransactionTempTs(), false}, *tuple);
+                                   {txn->GetTransactionTempTs(), false}, *tuple, CheckConflict_2);
           } else {
-            // Txn isn't first write the tuple
+            // 该rid记录在`write_set`中,说明当前txn已标记修改过该tuple,
+            // 此时其他txn再修改就发生w-w冲突, 所以后面更新tuple不需要考虑
+            // 并发问题, 也就不必check
+
+            // Txn isn't first update the tuple
             if (prev_link.has_value()) {
               auto undo_log = GenerateUpdatedUndoLog(&child_executor_->GetOutputSchema(), &base_tuple, tuple,
                                                      txn_mgr->GetUndoLog(*prev_link));
@@ -94,8 +98,6 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     // 即{last_page_id, tuple_id}
     *rid = *table_info->table_->InsertTuple({txn->GetTransactionTempTs(), false}, *tuple, nullptr, nullptr,
                                             plan_->table_oid_);
-    tuple->SetRid(*rid);
-
     // 更新mvcc相关ds
     txn->AppendWriteSet(table_info->oid_, *rid);
 
@@ -103,14 +105,14 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     for (auto &index_info : index_info_vec) {
       if (auto &index = index_info->index_;
           !index->InsertEntry(tuple->KeyFromTuple(table_info->schema_, *index->GetKeySchema(), index->GetKeyAttrs()),
-                              tuple->GetRid(), exec_ctx_->GetTransaction()) &&
+                              *rid, txn) &&
           index_info->is_primary_key_) {
         // Maybe useful, before throw exception
         {
-          auto write_set = txn->GetWriteSets();
-          for (auto &rid_dirty : write_set[table_info->oid_]) {
-            table_info->table_->UpdateTupleMeta({txn->GetTransactionTempTs(), true}, rid_dirty);
-          }
+          // auto write_set = txn->GetWriteSets();
+          // for (auto &rid_dirty : write_set[table_info->oid_]) {
+          //   table_info->table_->UpdateTupleMeta({txn->GetTransactionTempTs(), true}, rid_dirty);
+          // }
         }
         //
         txn->SetTainted();
