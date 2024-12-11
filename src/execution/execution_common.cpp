@@ -201,7 +201,7 @@ auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tup
   }
 
   if (base_tuple == nullptr) {
-    return UndoLog{true, {}, {}, 0, {}};
+    return UndoLog{true, {}, {}, ts, prev_version};
   }
 
   std::vector<bool> modified_fields(schema->GetColumnCount(), false);

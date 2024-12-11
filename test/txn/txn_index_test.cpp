@@ -115,7 +115,7 @@ TEST(TxnIndexTest, InsertDeleteTest) {  // NOLINT
                                     IntResult{{1, 0}, {2, 0}, {3, 0}, {4, 0}}));
 }
 
-TEST(TxnIndexTest, DISABLED_UpdateTest) {  // NOLINT
+TEST(TxnIndexTest, UpdateTest) {  // NOLINT
   const std::string query = "SELECT * FROM maintable";
 
   const auto prepare =
@@ -130,6 +130,7 @@ TEST(TxnIndexTest, DISABLED_UpdateTest) {  // NOLINT
     WithTxn(txn2, ExecuteTxn(*bustub, _var, _txn, "INSERT INTO maintable VALUES (3, 0), (5, 0)"));
     WithTxn(txn2, ExecuteTxn(*bustub, _var, _txn, "DELETE FROM maintable WHERE col1 = 3"));
     WithTxn(txn2, CommitTxn(*bustub, _var, _txn));
+    TxnMgrDbg("after cmit", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
     auto txn2_reverify = BeginTxn(*bustub, "txn2_reverify");
     // at this point, we have (1, 0) inserted, (2, 0) deleted, and (3, 0) self inserted and deleted.
     auto txn3 = BeginTxn(*bustub, "txn3");
@@ -212,7 +213,7 @@ TEST(TxnIndexTest, DISABLED_UpdateTest) {  // NOLINT
   // hidden tests...
 }
 
-TEST(GradingTxnIndexTest, DISABLED_IndexUpdateConflictTest) {  // NOLINT
+TEST(GradingTxnIndexTest, IndexUpdateConflictTest) {  // NOLINT
   const std::string query = "SELECT * FROM maintable";
 
   auto bustub = std::make_unique<BusTubInstance>();
@@ -236,7 +237,7 @@ TEST(GradingTxnIndexTest, DISABLED_IndexUpdateConflictTest) {  // NOLINT
   // hidden tests...
 }
 
-TEST(TxnIndexTest, DISABLED_UpdatePrimaryKeyTest) {  // NOLINT
+TEST(TxnIndexTest, UpdatePrimaryKeyTest) {  // NOLINT
   const std::string query = "SELECT * FROM maintable";
 
   auto bustub = std::make_unique<BusTubInstance>();

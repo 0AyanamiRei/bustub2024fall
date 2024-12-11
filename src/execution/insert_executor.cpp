@@ -36,21 +36,62 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   std::shared_ptr<bustub::IndexInfo> pkey_index_info =
       (pkey_index_iter != index_info_vec.end()) ? *pkey_index_iter : nullptr;
   auto &pkey_index = pkey_index_info->index_;
+  // If pkey_index_iter is not nullptr, pkey_index will be the Primary Key Index.
+  // Lab test cases will not create secondary indexes using CREATE INDEX,
+  // and thus we do not need to maintain secondary indexes in out code.
 
   while (child_executor_->Next(tuple, rid)) {
     // primary key check
     if (pkey_index_info != nullptr) {
-      if (std::vector<bustub::RID> result{};
-          pkey_index->ScanKey(
-              tuple->KeyFromTuple(table_info->schema_, *pkey_index->GetKeySchema(), pkey_index->GetKeyAttrs()), &result,
-              txn),
-          !result.empty()) {
-        txn->SetTainted();
-        throw ExecutionException("Repeated insertion of the same primary key");
+      std::vector<bustub::RID> result{};
+      pkey_index->ScanKey(
+          tuple->KeyFromTuple(table_info->schema_, *pkey_index->GetKeySchema(), pkey_index->GetKeyAttrs()), &result,
+          txn);
+      if (!result.empty()) {
+        tuple->SetRid(result[0]);
+        *rid = result[0];
+        if (auto [base_meta, base_tuple] = table_info->table_->GetTuple(tuple->GetRid()); base_meta.is_deleted_) {
+          // insert into tomb tuple: do what you do in update executor
+          // Updated tuple & updated version chain
+          auto table_info = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_).get();
+          auto base_ts = table_info->table_->GetTupleMeta(base_tuple.GetRid()).ts_;
+          auto txn_mgr = exec_ctx_->GetTransactionManager();
+          auto write_set = txn->GetWriteSets();
+          auto iter = write_set[plan_->table_oid_].find(*rid);
+          auto prev_link = txn_mgr->GetUndoLink(*rid);
+          if (iter == write_set[plan_->table_oid_].end()) {
+            // Txn first update the tuple
+            txn->AppendWriteSet(plan_->table_oid_, *rid);
+            auto undo_log = GenerateNewUndoLog(&child_executor_->GetOutputSchema(), nullptr, tuple, base_ts,
+                                               prev_link.has_value() ? *prev_link : UndoLink{});
+            auto undo_link =
+                txn->AppendUndoLog(undo_log);
+            UpdateTupleAndUndoLink(txn_mgr, *rid, undo_link, table_info->table_.get(), txn,
+                                   {txn->GetTransactionTempTs(), false}, *tuple);
+          } else {
+            // Txn isn't first write the tuple
+            if (prev_link.has_value()) {
+              auto undo_log = GenerateUpdatedUndoLog(&child_executor_->GetOutputSchema(), &base_tuple, tuple,
+                                                     txn_mgr->GetUndoLog(*prev_link));
+              txn->ModifyUndoLog(prev_link->prev_log_idx_, undo_log);
+            }
+            // The tuple inserted by self, not need to create undo_log
+            table_info->table_->UpdateTupleInPlace({txn->GetTransactionTempTs(), false}, *tuple, *rid);
+          }
+
+          cnt++;
+          continue;
+        } else {
+          txn->SetTainted();
+          throw ExecutionException("Repeated insertion of the same primary key");
+        }
       }
     }
 
     // 插入tuple
+    // warning & (TODO) 插入的tuple's rid字段不会自动填充
+    // 在TablePage::InsertTuple()中有足够的信息来填充
+    // 即{last_page_id, tuple_id}
     *rid = *table_info->table_->InsertTuple({txn->GetTransactionTempTs(), false}, *tuple, nullptr, nullptr,
                                             plan_->table_oid_);
     tuple->SetRid(*rid);
@@ -71,7 +112,7 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
             table_info->table_->UpdateTupleMeta({txn->GetTransactionTempTs(), true}, rid_dirty);
           }
         }
-        // 
+        //
         txn->SetTainted();
         throw ExecutionException("Repeated insertion of the same primary key");
       }

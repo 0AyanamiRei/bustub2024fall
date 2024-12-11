@@ -18,6 +18,7 @@
 
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
+#include "execution/expressions/column_value_expression.h"
 #include "execution/plans/update_plan.h"
 #include "execution/execution_common.h"
 #include "storage/table/tuple.h"
@@ -79,5 +80,6 @@ class UpdateExecutor : public AbstractExecutor {
   const TableInfo *table_info_; /** Metadata identifying the table that should be updated */
   std::unique_ptr<AbstractExecutor> child_executor_; /** The child executor to obtain value from */
   bool first_use_;
+  std::vector<Tuple> tuple_buffer;
 };
 }  // namespace bustub

@@ -23,18 +23,41 @@ UpdateExecutor::UpdateExecutor(ExecutorContext *exec_ctx, const UpdatePlanNode *
       child_executor_{std::move(child_executor)},
       first_use_{true} {}
 
-void UpdateExecutor::Init() {
-  // throw NotImplementedException("Update Node没有父节点, 不需要往下重启算子");
-}
+void UpdateExecutor::Init() {}
 
 /** (FIX ?)update中的undo_log应该加入 */
 auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   int32_t cnt = 0;
   Tuple base_tuple;
-  auto index_info_vec_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
+  auto index_info_vec = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
   auto txn = exec_ctx_->GetTransaction();
   auto txn_mgr = exec_ctx_->GetTransactionManager();
   auto &schema = child_executor_->GetOutputSchema();
+
+  __attribute_maybe_unused__ bool is_update_pkey = false;
+  {
+    auto pkey_index_iter =
+        std::find_if(index_info_vec.begin(), index_info_vec.end(),
+                     [](const std::shared_ptr<bustub::IndexInfo> &index_info) { return index_info->is_primary_key_; });
+    std::shared_ptr<bustub::IndexInfo> pkey_index_info =
+        (pkey_index_iter != index_info_vec.end()) ? *pkey_index_iter : nullptr;
+    auto &pkey_index = pkey_index_info->index_;
+    // If pkey_index_iter is not nullptr, pkey_index will be the Primary Key Index.
+
+    // 如何判断update字段是否包含Primary Key?
+    if (pkey_index_info != nullptr) {
+      for (auto attr : pkey_index->GetKeyAttrs()) {
+        auto &expr_base = plan_->target_expressions_[attr];
+
+        // 如果expr_base不是`ConstantValueExpression`类, 说明pkey的组成col需要更新
+        // 即pkey需要更新
+        if (const auto *expr = dynamic_cast<const ColumnValueExpression *>(expr_base.get()); expr == nullptr) {
+          is_update_pkey = true;
+          break;
+        }
+      }
+    }
+  }
 
   while (child_executor_->Next(&base_tuple, rid)) {
     // Check conflict in update executor
@@ -49,7 +72,7 @@ auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     }
 
     // delete (k,v) from index
-    for (auto &index_info_ : index_info_vec_) {
+    for (auto &index_info_ : index_info_vec) {
       auto &index_ = index_info_->index_;
       index_->DeleteEntry(base_tuple.KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
                           *rid, txn);
@@ -65,7 +88,7 @@ auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     tuple->SetRid(*rid);
 
     // Insert new (k,v) into index
-    for (auto &index_info_ : index_info_vec_) {
+    for (auto &index_info_ : index_info_vec) {
       auto &index_ = index_info_->index_;
       index_->InsertEntry(tuple->KeyFromTuple(table_info_->schema_, *index_->GetKeySchema(), index_->GetKeyAttrs()),
                           *rid, txn);

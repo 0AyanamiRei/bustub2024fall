@@ -25,14 +25,14 @@ void SeqScanExecutor::Init() {
 
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   while(!iter_->IsEnd()) {
-    auto [meta, data] = iter_->GetTuple();
+    auto [base_meta, base_tuple] = iter_->GetTuple();
     // Get the readable version of the tuple
-    auto t = GetReadableTuple(&GetOutputSchema(), data, meta, exec_ctx_->GetTransaction(),
+    auto latest_tuple = GetReadableTuple(&GetOutputSchema(), base_tuple, base_meta, exec_ctx_->GetTransaction(),
                                  exec_ctx_->GetTransactionManager());
     ++(*iter_.get());
-    if(t.has_value()) {
-      // Otherwise, t is std::nullopt means the tuple did not exist at this time
-      *tuple = *t;
+    if(latest_tuple.has_value()) {
+      // Otherwise, latest_tuple is std::nullopt means the tuple did not exist at this time
+      *tuple = *latest_tuple;
       *rid = tuple->GetRid();
       if(plan_->filter_predicate_) {
         auto value = plan_->filter_predicate_->Evaluate(tuple, GetOutputSchema());
