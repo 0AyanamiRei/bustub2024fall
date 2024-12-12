@@ -160,9 +160,10 @@ auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tupl
 }
 
 /** equivalent to `ReconstructTuple`+`CollectUndoLogs` */
-auto GetReadableTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta, Transaction *txn,
+auto GetReadableTuple(const Schema *schema, const RID rid, Transaction *txn, TableHeap *table_heap,
                       TransactionManager *txn_mgr) -> std::optional<Tuple> {
-  auto undo_link = txn_mgr->GetUndoLink(base_tuple.GetRid());
+  auto [base_meta, base_tuple, undo_link] = GetTupleAndUndoLink(txn_mgr, table_heap, rid);
+  
   if (undo_link.has_value()) {
     // Now, undo_link is not std::nullopt, we suppose the base_tuple has been updated/deleted
     auto undo_logs = CollectUndoLogs(base_tuple.GetRid(), base_meta, base_tuple, undo_link, txn, txn_mgr);

@@ -36,7 +36,6 @@ auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   if (tuple_buffer.empty()) {
     return false;
   }
-
   Tuple base_tuple;
   auto index_info_vec = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
   auto txn = exec_ctx_->GetTransaction();
@@ -48,6 +47,7 @@ auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   auto &pkey_index = pkey_index_info->index_;
   // If pkey_index_iter is not nullptr, pkey_index will be the Primary Key Index.
 
+  //! Check if we are updating the Primary Key.
   bool is_update_pkey = false;
   {
     // 如何判断update字段是否包含Primary Key?
@@ -65,62 +65,121 @@ auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     }
   }
 
-  for (auto &base_tuple : tuple_buffer) {
-    // Check conflict in update executor
-    // @explain
-    // Here, if CheckConflict_1() return true shows
-    // the base_tuple was modified by other txn,
-    // no matter it commits or not.
-    if (CheckConflict_1(txn, table_info_->table_->GetTupleMeta(base_tuple.GetRid()).ts_)) {
-      txn->SetTainted();
-      throw ExecutionException("Write conflict during updating");
-    }
-
-    // if possible, delete (k,v) from primary key index
-    if (is_update_pkey) {
-      pkey_index->DeleteEntry(
-          base_tuple.KeyFromTuple(table_info_->schema_, *pkey_index->GetKeySchema(), pkey_index->GetKeyAttrs()),
-          base_tuple.GetRid(), txn);
-    }
-  }
-
-  for (auto &base_tuple : tuple_buffer) {
-    // Created a new tuple from base_tuple and exprs
-    std::vector<Value> values{};
-    values.reserve(schema.GetColumnCount());
-    for (auto &expr : plan_->target_expressions_) {
-      values.push_back(expr->Evaluate(&base_tuple, schema));
-    }
-    *tuple = Tuple(values, &schema);
-    tuple->SetRid(base_tuple.GetRid());
-
-    // If possible, Insert new (k,v) primary key index
-    if (is_update_pkey) {
-      pkey_index->InsertEntry(
-          tuple->KeyFromTuple(table_info_->schema_, *pkey_index->GetKeySchema(), pkey_index->GetKeyAttrs()),
-          base_tuple.GetRid(), txn);
-    }
-
-    // Updated tuple & updated version chain
-    auto write_set = txn->GetWriteSets();
-    auto iter = write_set[plan_->table_oid_].find(base_tuple.GetRid());
-    auto prev_link = txn_mgr->GetUndoLink(base_tuple.GetRid());
-    if (iter == write_set[plan_->table_oid_].end()) {
-      // Txn first update the tuple
-      txn->AppendWriteSet(plan_->table_oid_, base_tuple.GetRid());
-      auto undo_log =
-          GenerateNewUndoLog(&schema, &base_tuple, tuple, table_info_->table_->GetTupleMeta(base_tuple.GetRid()).ts_, prev_link.has_value() ? *prev_link : UndoLink{});
-      auto undo_link = txn->AppendUndoLog(undo_log);
-      UpdateTupleAndUndoLink(txn_mgr, base_tuple.GetRid(), undo_link, table_info_->table_.get(), txn,
-                             {txn->GetTransactionTempTs(), false}, *tuple);
-    } else {
-      // Txn isn't first write the tuple
-      if (prev_link.has_value()) {
-        auto undo_log = GenerateUpdatedUndoLog(&schema, &base_tuple, tuple, txn_mgr->GetUndoLog(*prev_link));
-        txn->ModifyUndoLog(prev_link->prev_log_idx_, undo_log);
+  if (is_update_pkey) {
+    //! First, delete all the tuple
+    for (auto &old_tuple : tuple_buffer) {
+      //! The tuples in the tuple_buffer maybe out of data
+      //! what's more, we need the undo_link, too, so...
+      auto [base_meta, base_tuple, prev_link] =
+          GetTupleAndUndoLink(txn_mgr, table_info_->table_.get(), old_tuple.GetRid());
+      //! Check conflict, the tuple maybe modified by other txn
+      //! (TODO) 如果从某处开始, 该txn标记为TAINTED然后抛出异常, 那么table_heap中
+      //! 会永久存在持有temp-ts标记的tuple, 导致后面的txn修改它们时也检测到冲突
+      //! 所以需要考虑回退前面修改过的内容, 而即使有了回滚的行为, 它也不是原子性的
+      //! 仍然会出现上述情况导致其他txn误认为发生冲突, 从而导致更多级联冲突
+      if (CheckConflict_1(txn, base_meta.ts_)) {
+        txn->SetTainted();
+        throw ExecutionException("Write conflict during updating");
       }
-      // The tuple inserted by self, not need to create undo_log
-      table_info_->table_->UpdateTupleInPlace({txn->GetTransactionTempTs(), false}, *tuple, base_tuple.GetRid());
+
+      //! Delete and tag it with temp ts from the table_heap
+      //! but won't change the index.
+      auto write_set = txn->GetWriteSets();
+      auto iter = write_set[plan_->table_oid_].find(old_tuple.GetRid());
+      if (iter == write_set[plan_->table_oid_].end()) {
+        //! Txn first update the tuple
+        txn->AppendWriteSet(plan_->table_oid_, old_tuple.GetRid());
+        auto undo_log =
+            UndoLog{false, std::vector<bool>(schema.GetColumnCount(), true), base_tuple, base_meta.ts_, *prev_link};
+        auto undo_link = txn->AppendUndoLog(undo_log);
+        if (!UpdateTupleAndUndoLink(txn_mgr, old_tuple.GetRid(), undo_link, table_info_->table_.get(), txn,
+                                    {txn->GetTransactionTempTs(), true}, base_tuple, CheckConflict_2)) {
+          txn->SetTainted();
+          throw ExecutionException("Write conflict during updating");
+        }
+      } else {
+        //! Txn has modified the tuple by self, the undo_log we don't need to modify.
+        //! What's more, the tuple has also been tagged, below is concurrently safe.
+        table_info_->table_->UpdateTupleMeta({txn->GetTransactionTempTs(), true}, old_tuple.GetRid());
+      }
+    }
+
+    //! Second, insert new tuple
+    for (auto &base_tuple : tuple_buffer) {
+      //! Created a new tuple from base_tuple and exprs
+      {
+        std::vector<Value> values{};
+        values.reserve(schema.GetColumnCount());
+        for (auto &expr : plan_->target_expressions_) {
+          values.push_back(expr->Evaluate(&base_tuple, schema));
+        }
+        *tuple = Tuple(values, &schema);
+        tuple->SetRid(base_tuple.GetRid());
+      }
+
+      //! If update the pkey, now all tuple will be updated are
+      //! tagged with txn's temp ts, so, the following areas are concurrently safe
+      std::vector<RID> result{};
+      pkey_index->ScanKey(
+          tuple->KeyFromTuple(table_info_->schema_, *pkey_index->GetKeySchema(), pkey_index->GetKeyAttrs()), &result,
+          txn);
+      if (result.empty()) {
+        //! It shows that we need to create a new tuple and insert it.
+        *rid = *table_info_->table_->InsertTuple({txn->GetTransactionTempTs(), false}, *tuple, nullptr, nullptr,
+                                                 plan_->table_oid_);
+        txn->AppendWriteSet(table_info_->oid_, *rid);
+        pkey_index->InsertEntry(
+            tuple->KeyFromTuple(table_info_->schema_, *pkey_index->GetKeySchema(), pkey_index->GetKeyAttrs()), *rid,
+            txn);
+      } else {
+        //! Otherwise, we just need to update the tuple in the heap,
+        //! Carefully, we need to update the rigth place with the result[0].
+        tuple->SetRid(result[0]);
+        table_info_->table_->UpdateTupleInPlace({txn->GetTransactionTempTs(), false}, *tuple, tuple->GetRid());
+      }
+    }
+  } else {
+    for (auto &old_tuple : tuple_buffer) {
+      auto [base_meta, base_tuple, prev_link] =
+          GetTupleAndUndoLink(txn_mgr, table_info_->table_.get(), old_tuple.GetRid());
+      if (CheckConflict_1(txn, base_meta.ts_)) {
+        txn->SetTainted();
+        throw ExecutionException("Write conflict during updating");
+      }
+
+      //! Created a new tuple from base_tuple and exprs
+      {
+        std::vector<Value> values{};
+        values.reserve(schema.GetColumnCount());
+        for (auto &expr : plan_->target_expressions_) {
+          values.push_back(expr->Evaluate(&base_tuple, schema));
+        }
+        *tuple = Tuple(values, &schema);
+        tuple->SetRid(old_tuple.GetRid());
+      }
+
+      // Updated tuple & updated version chain
+      auto write_set = txn->GetWriteSets();
+      auto iter = write_set[plan_->table_oid_].find(tuple->GetRid());
+      if (iter == write_set[plan_->table_oid_].end()) {
+        // Txn first update the tuple
+        txn->AppendWriteSet(plan_->table_oid_, tuple->GetRid());
+        auto undo_log = GenerateNewUndoLog(&schema, &base_tuple, tuple, base_meta.ts_, *prev_link);
+        auto undo_link = txn->AppendUndoLog(undo_log);
+        if (!UpdateTupleAndUndoLink(txn_mgr, tuple->GetRid(), undo_link, table_info_->table_.get(), txn,
+                                    {txn->GetTransactionTempTs(), false}, *tuple, CheckConflict_2)) {
+          txn->SetTainted();
+          throw ExecutionException("Write conflict during updating");
+        }
+      } else {
+        // Txn isn't first write the tuple
+        if (prev_link.has_value()) {
+          auto undo_log = GenerateUpdatedUndoLog(&schema, &base_tuple, tuple, txn_mgr->GetUndoLog(*prev_link));
+          txn->ModifyUndoLog(prev_link->prev_log_idx_, undo_log);
+        }
+        // The tuple inserted by self, not need to create undo_log
+        table_info_->table_->UpdateTupleInPlace({txn->GetTransactionTempTs(), false}, *tuple, tuple->GetRid());
+      }
     }
   }
 

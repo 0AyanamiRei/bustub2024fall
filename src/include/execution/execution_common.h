@@ -61,7 +61,7 @@ auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tupl
                      Transaction *txn, TransactionManager *txn_mgr) -> std::optional<std::vector<UndoLog>>;
 
 /** 获取当前事务可见的tuple版本 */
-auto GetReadableTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta, Transaction *txn,
+auto GetReadableTuple(const Schema *schema, const RID rid, Transaction *txn, TableHeap *table_heap,
                       TransactionManager *txn_mgr) -> std::optional<Tuple>;
 
 auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tuple *target_tuple, timestamp_t ts,

@@ -41,7 +41,6 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     // the base_tuple was deleted by other txn,
     // no matter it commits or not.
     auto base_ts = table_info_->table_->GetTupleMeta(base_tuple.GetRid()).ts_;
-        
     if (CheckConflict_1(txn, base_ts)) {
       txn->SetTainted();
       throw ExecutionException("Write conflict during deleting");

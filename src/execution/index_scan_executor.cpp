@@ -49,8 +49,7 @@ auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     if (!result.empty()) {
       auto &table_heap = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->table_;
       for (auto &base_rid : result) {
-        auto [base_meta, base_tuple] = table_heap->GetTuple(base_rid);
-        auto latest_tuple = GetReadableTuple(&GetOutputSchema(), base_tuple, base_meta, txn, txn_mgr);
+        auto latest_tuple = GetReadableTuple(&GetOutputSchema(), base_rid, txn, table_heap.get(), txn_mgr);
         if (latest_tuple.has_value()) {
           *tuple = *latest_tuple;
           *rid = tuple->GetRid();
@@ -64,10 +63,10 @@ auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 
 auto IndexScanExecutor::NextScan(Tuple *tuple, RID *rid) -> bool {
   while (!iter_.IsEnd()) {
-    auto [_, x] = (*iter_);
-    auto [base_meta, base_tuple] = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->table_->GetTuple(x);
+    auto [_, rid_] = (*iter_);
     // Get the readable version of the tuple
-    auto latest_tuple = GetReadableTuple(&GetOutputSchema(), base_tuple, base_meta, exec_ctx_->GetTransaction(),
+    auto latest_tuple = GetReadableTuple(&GetOutputSchema(), rid_, exec_ctx_->GetTransaction(),
+                                         exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->table_.get(),
                                          exec_ctx_->GetTransactionManager());
     ++iter_;
     if (latest_tuple.has_value()) {
