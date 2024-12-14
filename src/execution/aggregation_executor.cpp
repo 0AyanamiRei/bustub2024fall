@@ -14,15 +14,17 @@
 
 #include "execution/executors/aggregation_executor.h"
 
+// NOLINTBEGIN
+
 namespace bustub {
 
 AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const AggregationPlanNode *plan,
                                          std::unique_ptr<AbstractExecutor> &&child_executor)
-    : AbstractExecutor{exec_ctx}, 
-      plan_{plan}, 
-      child_executor_{std::move(child_executor)}, 
-      aht_{plan->aggregates_, plan->agg_types_}, 
-      aht_iterator_{aht_.Begin()}, 
+    : AbstractExecutor{exec_ctx},
+      plan_{plan},
+      child_executor_{std::move(child_executor)},
+      aht_{plan->aggregates_, plan->agg_types_},
+      aht_iterator_{aht_.Begin()},
       first_{true} {
   RID rid{};
   Tuple tuple{};
@@ -40,7 +42,7 @@ AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const Aggreg
  * Agg { types=[], aggregates=[], group_by=["#0.0", "#0.1", "#0.2", "#0.3"] }
  *     Agg { types=["sum", "sum", "sum"], aggregates=["#0.1", "#0.2", "#0.0"], group_by=["#0.3"] }
  * 第一个Agg调用child_executor_->Next(..)后, 第二个Agg执行的时候会出问题
-*/
+ */
 void AggregationExecutor::Init() {
   aht_iterator_ = {aht_.Begin()};
   first_ = true;
@@ -50,19 +52,19 @@ auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   std::vector<Value> values;
   values.reserve(GetOutputSchema().GetColumnCount());
 
-  if(aht_.Begin() == aht_.End()) {
-    if(plan_->GetGroupBys().size() != 0U) {
-      return  false;
+  if (aht_.Begin() == aht_.End()) {
+    if (plan_->GetGroupBys().size() != 0U) {
+      return false;
     }
   }
 
-  if(first_) {
-    if(aht_iterator_ == aht_.End()) {
+  if (first_) {
+    if (aht_iterator_ == aht_.End()) {
       for (const auto &expr : plan_->GetGroupBys()) {
         values.emplace_back(ValueFactory::GetNullValueByType(expr->GetReturnType().GetType()));
       }
-      for(uint32_t i = 0; i < plan_->agg_types_.size(); i ++) {
-        if(plan_->agg_types_[i] == AggregationType::CountStarAggregate) {
+      for (uint32_t i = 0; i < plan_->agg_types_.size(); i++) {
+        if (plan_->agg_types_[i] == AggregationType::CountStarAggregate) {
           values.emplace_back(ValueFactory::GetZeroValueByType(plan_->aggregates_[i]->GetReturnType().GetType()));
         } else {
           values.emplace_back(ValueFactory::GetNullValueByType(plan_->aggregates_[i]->GetReturnType().GetType()));
@@ -74,13 +76,13 @@ auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     } else {
       auto keys = aht_iterator_.Key().group_bys_;
       auto vals = aht_iterator_.Val().aggregates_;
-      for(uint32_t i = 0; i < keys.size(); i ++) {
+      for (uint32_t i = 0; i < keys.size(); i++) {
         values.push_back(keys[i]);
       }
-      for(uint32_t i = 0; i < vals.size(); i ++) {
+      for (uint32_t i = 0; i < vals.size(); i++) {
         values.push_back(vals[i]);
       }
-      if(++aht_iterator_ == aht_.End()) { /**< 下次返回false */
+      if (++aht_iterator_ == aht_.End()) { /**< 下次返回false */
         first_ = false;
       }
       *tuple = Tuple(values, &GetOutputSchema());
@@ -94,6 +96,8 @@ auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 auto AggregationExecutor::GetChildExecutor() const -> const AbstractExecutor * { return child_executor_.get(); }
 
 }  // namespace bustub
+
+// NOLINTEND
 
 /**************************
  * @example

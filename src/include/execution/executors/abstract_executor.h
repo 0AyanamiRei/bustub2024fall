@@ -22,10 +22,10 @@ class ExecutorContext;
  * This is the base class from which all executors in the BustTub execution
  * engine inherit, and defines the minimal interface that all executors support.
  * 需要提供的API:
- * 
+ *
  * Init();
  * Next();
- * 
+ *
  */
 class AbstractExecutor {
  public:

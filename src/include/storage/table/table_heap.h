@@ -45,7 +45,7 @@ class TableHeap {
    * Create a table heap without a transaction. (open table)
    * @param buffer_pool_manager the buffer pool manager
    * @param first_page_id the id of the first page
-   * 
+   *
    * (TODO) open table是用来做什么的?
    */
   explicit TableHeap(BufferPoolManager *bpm);

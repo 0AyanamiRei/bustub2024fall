@@ -59,7 +59,7 @@ TEST(TxnTsTest, TimestampTracking) {  // NOLINT
     auto txn_store_1 = bustub->txn_manager_->Begin();
     ASSERT_EQ(txn_store_1->GetReadTs(), 0);
     bustub->txn_manager_->Commit(txn_store_1);
-    ASSERT_EQ(txn_store_1->GetCommitTs(), 1); // 这里的cmit_ts=1
+    ASSERT_EQ(txn_store_1->GetCommitTs(), 1);  // 这里的cmit_ts=1
   }
 
   ASSERT_EQ(bustub->txn_manager_->GetWatermark(), 0);

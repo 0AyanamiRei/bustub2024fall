@@ -15,10 +15,10 @@
 #include <memory>
 #include <utility>
 
-
+#include "concurrency/transaction_manager.h"
+#include "execution/execution_common.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
-#include "execution/execution_common.h"
 #include "execution/plans/insert_plan.h"
 #include "storage/table/tuple.h"
 
@@ -58,7 +58,7 @@ class InsertExecutor : public AbstractExecutor {
 
  private:
   const InsertPlanNode *plan_; /**< The insert plan node to be executed*/
-  bool first_use_;
+  bool first_use_{true};
   std::unique_ptr<AbstractExecutor> child_executor_;
 };
 

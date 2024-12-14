@@ -87,12 +87,18 @@ class TransactionManager {
 
   /** @brief delete this version chain from (undo_link)-> `undo_log` to end
    * delete it from txn's undo_logs_, too
-  */
+   */
   void WalkChain(UndoLink undo_link, std::unordered_map<txn_id_t, uint32_t> &delete_count);
 
   /** @brief 符合常理的gc设置, 不用于lab test */
   __attribute__((unused)) void GarbageCollection(BufferPoolManager *bpm_);
   __attribute__((unused)) void WalkChainAndClear(RID rid, std::unordered_map<txn_id_t, uint32_t> &delete_count);
+
+  auto Check(const TupleMeta &meta, const Tuple &tuple, RID rid, std::optional<UndoLink> undo_link) -> bool;
+
+  /////////////////////////////
+  // 成员变量
+  ////////////////////////////
 
   /** protects txn map */
   std::shared_mutex txn_map_mutex_;

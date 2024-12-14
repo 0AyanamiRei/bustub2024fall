@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOLINTBEGIN
+
 #include <memory>
 
 #include "execution/executors/insert_executor.h"
@@ -66,13 +68,15 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
                                                table_info->table_->GetTupleMeta(base_tuple.GetRid()).ts_,
                                                prev_link.has_value() ? *prev_link : UndoLink{});
             auto undo_link = txn->AppendUndoLog(undo_log);
+            // auto boundCheck = std::bind(&TransactionManager::Check, txn_mgr, std::placeholders::_1,
+            // std::placeholders::_2,
+            //                             std::placeholders::_3, std::placeholders::_4);
             UpdateTupleAndUndoLink(txn_mgr, *rid, undo_link, table_info->table_.get(), txn,
-                                   {txn->GetTransactionTempTs(), false}, *tuple, CheckConflict_2);
+                                   {txn->GetTransactionTempTs(), false}, *tuple);
           } else {
             // 该rid记录在`write_set`中,说明当前txn已标记修改过该tuple,
             // 此时其他txn再修改就发生w-w冲突, 所以后面更新tuple不需要考虑
             // 并发问题, 也就不必check
-
             // Txn isn't first update the tuple
             if (prev_link.has_value()) {
               auto undo_log = GenerateUpdatedUndoLog(&child_executor_->GetOutputSchema(), &base_tuple, tuple,
@@ -136,3 +140,5 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 }
 
 }  // namespace bustub
+
+// NOLINTEND

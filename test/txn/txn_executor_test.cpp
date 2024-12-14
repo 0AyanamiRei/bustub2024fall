@@ -622,10 +622,10 @@ TEST(TxnExecutorTest, GarbageCollection) {  // NOLINT
 
   fmt::println(stderr, "A: first GC");
   TxnMgrDbg("before garbage collection", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
-          fmt::println(stderr, "B: second GC");
+  fmt::println(stderr, "B: second GC");
   GarbageCollection(*bustub);
   TxnMgrDbg("after garbage collection", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
-          fmt::println(stderr, "B: second GC");
+  fmt::println(stderr, "B: second GC");
   GarbageCollection(*bustub);
   TxnMgrDbg("after garbage collection (yes, we call it twice without doing anything...)", bustub->txn_manager_.get(),
             table_info.get(), table_info->table_.get());

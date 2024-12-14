@@ -51,10 +51,7 @@ struct TableInfo {
    * @param oid The unique OID for the table
    */
   TableInfo(Schema schema, std::string name, std::unique_ptr<TableHeap> &&table, table_oid_t oid)
-      : schema_{std::move(schema)},
-        name_{std::move(name)},
-        table_{std::move(table)},
-        oid_{oid} {}
+      : schema_{std::move(schema)}, name_{std::move(name)}, table_{std::move(table)}, oid_{oid} {}
 
   Schema schema_;                    /**< The table schema */
   const std::string name_;           /**< The table name */
@@ -83,14 +80,14 @@ struct IndexInfo {
         key_size_{key_size},
         is_primary_key_{is_primary_key},
         index_type_(index_type) {}
-  Schema key_schema_; /**< The schema for the index key */
-  std::string name_;  /**< The name of the index */
-  std::unique_ptr<Index> index_;  /**< An owning pointer to the index */
-  index_oid_t index_oid_;  /**< The unique OID for the index */
-  std::string table_name_; /**< The name of the table on which the index is created */
-  const size_t key_size_;  /**< The size of the index key, in bytes */
-  bool is_primary_key_;    /**< Is primary key index? */
-  IndexType index_type_;   /**< The index type */
+  Schema key_schema_;            /**< The schema for the index key */
+  std::string name_;             /**< The name of the index */
+  std::unique_ptr<Index> index_; /**< An owning pointer to the index */
+  index_oid_t index_oid_;        /**< The unique OID for the index */
+  std::string table_name_;       /**< The name of the table on which the index is created */
+  const size_t key_size_;        /**< The size of the index key, in bytes */
+  bool is_primary_key_;          /**< Is primary key index? */
+  IndexType index_type_;         /**< The index type */
 };
 
 /**
@@ -204,7 +201,7 @@ class Catalog {
   auto CreateIndex(Transaction *txn, const std::string &index_name, const std::string &table_name, const Schema &schema,
                    const Schema &key_schema, const std::vector<uint32_t> &key_attrs, std::size_t keysize,
                    HashFunction<KeyType> hash_function, bool is_primary_key = false,
-                   IndexType index_type = IndexType::BPlusTreeIndex) -> std::shared_ptr<IndexInfo> {    
+                   IndexType index_type = IndexType::BPlusTreeIndex) -> std::shared_ptr<IndexInfo> {
     // Reject the creation request for nonexistent table
     if (table_names_.find(table_name) == table_names_.end()) {
       return NULL_INDEX_INFO;

@@ -122,11 +122,13 @@ TEST(TxnIndexTest, IndexConcurrentUpdateTest) {  // NOLINT
     auto bustub = std::make_unique<BusTubInstance>();
     EnsureIndexScan(*bustub);
     Execute(*bustub, "CREATE TABLE maintable(a int primary key, b int)");
+    // auto table_info = bustub->catalog_->GetTable("maintable");
     std::vector<std::thread> update_threads;
     const int thread_cnt = 8;
     const int number_cnt = 20;
     Execute(*bustub, generate_insert_sql(number_cnt), false);
     TableHeapEntryNoMoreThan(*bustub, bustub->catalog_->GetTable("maintable").get(), number_cnt);
+    // TxnMgrDbg("start", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
     update_threads.reserve(thread_cnt);
     std::map<int, std::vector<bool>> operation_result;
     std::mutex result_mutex;
@@ -139,12 +141,14 @@ TEST(TxnIndexTest, IndexConcurrentUpdateTest) {  // NOLINT
                                    generate_delete_sql, generate_txn_insert_sql, &result_mutex, &operation_result]() {
         NoopWriter writer;
         std::vector<bool> result;
+        int abort_int = 0;
         result.reserve(number_cnt);
         for (int i = 0; i < number_cnt; i++) {
           auto sql = generate_sql(thread, i);
           auto *txn = bustub->txn_manager_->Begin();
           if (!bustub->ExecuteSqlTxn(sql, writer, txn)) {
             result.push_back(false);
+            abort_int++;
             continue;
           }
           if (add_delete_insert) {
@@ -162,6 +166,7 @@ TEST(TxnIndexTest, IndexConcurrentUpdateTest) {  // NOLINT
         }
         {
           std::lock_guard<std::mutex> lck(result_mutex);
+          LOG_INFO("abort rate: %d/%zu", abort_int, result.size());
           operation_result.emplace(thread, std::move(result));
         }
       });
@@ -184,6 +189,7 @@ TEST(TxnIndexTest, IndexConcurrentUpdateTest) {  // NOLINT
     auto query_txn = BeginTxn(*bustub, "query_txn");
     WithTxn(query_txn, QueryShowResult(*bustub, _var, _txn, "SELECT * FROM maintable", expected_rows));
     TableHeapEntryNoMoreThan(*bustub, bustub->catalog_->GetTable("maintable").get(), number_cnt);
+    // TxnMgrDbg("end", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
     if (n == trials - 1 || n == trials - 2) {
       SimpleStreamWriter writer(std::cerr);
       fmt::println(stderr, "--- the following data might be manually inspected by TAs ---");
@@ -192,7 +198,7 @@ TEST(TxnIndexTest, IndexConcurrentUpdateTest) {  // NOLINT
   }
 }
 
-TEST(TxnIndexTest, DISABLED_IndexConcurrentUpdateAbortTest) {  // NOLINT
+TEST(TxnIndexTest, IndexConcurrentUpdateAbortTest) {  // NOLINT
   const auto generate_sql = [](int n) -> std::string {
     return fmt::format("UPDATE maintable SET b = b + {} WHERE a = {}", 1, n);
   };

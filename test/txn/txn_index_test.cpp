@@ -267,6 +267,75 @@ TEST(TxnIndexTest, UpdatePrimaryKeyTest) {  // NOLINT
   // hidden tests...
 }
 
+TEST(TxnIndexTest, HiddenUpdatePrimaryKeyTest) {  // NOLINT
+  const std::string query = "SELECT * FROM maintable";
+  auto bustub = std::make_unique<BusTubInstance>();
+  EnsureIndexScan(*bustub);
+  Execute(*bustub, "CREATE TABLE maintable(col1 int primary key, col2 int)");
+  auto table_info = bustub->catalog_->GetTable("maintable");
+
+  auto txn1 = BeginTxn(*bustub, "txn1");
+
+  {
+    WithTxn(txn1, ExecuteTxn(*bustub, _var, _txn, "INSERT INTO maintable VALUES (1, 0), (2, 0), (3, 0), (4, 0)"));
+    WithTxn(txn1, CommitTxn(*bustub, _var, _txn));
+    TxnMgrDbg("after txn1 insert", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
+  }
+
+  auto txn1_reverify = BeginTxn(*bustub, "txn1_reverify");
+  auto txn2 = BeginTxn(*bustub, "txn2");
+
+  {
+    WithTxn(txn2, ExecuteTxn(*bustub, _var, _txn, "UPDATE maintable SET col1 = col1 + 1"));
+    WithTxn(txn2, CommitTxn(*bustub, _var, _txn));
+    TxnMgrDbg("after txn2 update", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
+  }
+
+  auto txn2_reverify = BeginTxn(*bustub, "txn2_reverify");
+  auto txn3 = BeginTxn(*bustub, "txn3");
+
+  {
+    WithTxn(txn3, ExecuteTxn(*bustub, _var, _txn, "UPDATE maintable SET col1 = col1 - 2"));
+    WithTxn(txn3, CommitTxn(*bustub, _var, _txn));
+    TxnMgrDbg("after txn3 update", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
+  }
+
+  auto txn3_reverify = BeginTxn(*bustub, "txn3_reverify");
+  auto txn4 = BeginTxn(*bustub, "txn4");
+
+  {
+    WithTxn(txn4, ExecuteTxn(*bustub, _var, _txn, "UPDATE maintable SET col1 = col1 + 10"));
+    WithTxn(txn4, CommitTxn(*bustub, _var, _txn));
+    TxnMgrDbg("after txn4 update", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
+  }
+
+  auto txn4_reverify = BeginTxn(*bustub, "txn4_reverify");
+  auto txn5 = BeginTxn(*bustub, "txn5");
+
+  {
+    WithTxn(txn5, ExecuteTxn(*bustub, _var, _txn, "UPDATE maintable SET col1 = col1, col2 = 1"));
+    WithTxn(txn5, CommitTxn(*bustub, _var, _txn));
+    TxnMgrDbg("after txn5 update", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
+  }
+
+  auto txn5_reverify = BeginTxn(*bustub, "txn5_reverify");
+  auto txn6 = BeginTxn(*bustub, "txn6");
+
+  {
+    WithTxn(txn6, ExecuteTxnTainted(*bustub, _var, _txn, "UPDATE maintable SET col1 = col1, col2 = 1"));
+    TxnMgrDbg("after txn6 update", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
+  }
+
+  {
+    WithTxn(txn1_reverify, ExecuteTxn(*bustub, _var, _txn, query));
+    WithTxn(txn2_reverify, QueryShowResult(*bustub, _var, _txn, query, IntResult{{2, 0}, {3, 0}, {4, 0}, {5, 0}}));
+    (void)txn3_reverify;
+    (void)txn4_reverify;
+    (void)txn5_reverify;
+
+  }
+}
+
 // NOLINTEND(bugprone-unchecked-optional-access))
 
 }  // namespace bustub

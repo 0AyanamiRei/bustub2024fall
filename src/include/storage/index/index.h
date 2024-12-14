@@ -181,7 +181,7 @@ class Index {
    * @param key The index key
    * @param result The collection of RIDs that is populated with results of the search
    * @param transaction The transaction context
-   * 
+   *
    * 在bustub中never insert duplicate rows into tables with indexes
    * 所以`Scankey`每次搜索result的长度都为1
    */

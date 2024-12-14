@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOLINTBEGIN
+
 #pragma once
 
 #include <memory>
@@ -54,20 +56,19 @@ class SortPlanNode : public AbstractPlanNode {
   void Show_order_bys() const {
     for (auto &sort : order_bys_) {
       std::string a;
-      switch (sort.first)
-      {
-      case OrderByType::INVALID:
-        a = "INVALID";
-        break;
-      case OrderByType::DEFAULT:
-        a = "DEFAULT";
-        break;
-      case OrderByType::ASC:
-        a = "ASC";
-        break;
-      case OrderByType::DESC:
-        a = "DESC";
-        break;
+      switch (sort.first) {
+        case OrderByType::INVALID:
+          a = "INVALID";
+          break;
+        case OrderByType::DEFAULT:
+          a = "DEFAULT";
+          break;
+        case OrderByType::ASC:
+          a = "ASC";
+          break;
+        case OrderByType::DESC:
+          a = "DESC";
+          break;
       };
       cout << a << "-" << sort.second->ToString() << " ";
     }
@@ -83,3 +84,5 @@ class SortPlanNode : public AbstractPlanNode {
 };
 
 }  // namespace bustub
+
+// NOLINTEND

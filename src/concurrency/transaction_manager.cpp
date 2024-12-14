@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOLINTBEGIN
+
 #include "concurrency/transaction_manager.h"
 
 #include <memory>
@@ -96,6 +98,9 @@ void TransactionManager::Abort(Transaction *txn) {
   }
 
   // TODO(fall2023): Implement the abort logic!
+  for (auto rid : txn->GetWriteSets()) {
+    
+  }
 
   std::unique_lock<std::shared_mutex> lck(txn_map_mutex_);
   txn->state_ = TransactionState::ABORTED;
@@ -111,7 +116,7 @@ void TransactionManager::GarbageCollection() {
     auto &[txn_id, txn] = *iter;
     auto state = txn->GetTransactionState();
     if (state == TransactionState::ABORTED || state == TransactionState::COMMITTED) {
-      if (txn->undo_logs_.size() == 0U || water_mark > txn->commit_ts_.load()) {
+      if (txn->undo_logs_.empty() || water_mark > txn->commit_ts_.load()) {
         iter = txn_map_.erase(iter);
         continue;
       }
@@ -124,7 +129,7 @@ void TransactionManager::WalkChain(UndoLink undo_link, std::unordered_map<txn_id
   while (undo_link.IsValid()) {
     auto txn = txn_map_[undo_link.prev_txn_];
     auto undo_log = txn->undo_logs_[undo_link.prev_log_idx_];
-    if (delete_count.count(undo_link.prev_txn_)) {
+    if (delete_count.count(undo_link.prev_txn_) != 0U) {
       delete_count[undo_link.prev_txn_]++;
     } else {
       delete_count[undo_link.prev_txn_] = 1;
@@ -175,7 +180,7 @@ void TransactionManager::GarbageCollection(BufferPoolManager *bpm_) {
     auto &[txn_id, txn] = *iter;
     auto state = txn->GetTransactionState();
     if (state == TransactionState::ABORTED || state == TransactionState::COMMITTED) {
-      if (txn->undo_logs_.size() == 0U || txn->undo_logs_.size() == delete_count[txn_id]) {
+      if (txn->undo_logs_.empty() || txn->undo_logs_.size() == delete_count[txn_id]) {
         iter = txn_map_.erase(iter);
         continue;
       }
@@ -188,20 +193,33 @@ void TransactionManager::WalkChainAndClear(RID rid, std::unordered_map<txn_id_t,
   throw NotImplementedException("Not implement this function");
 }
 
+///! Only used if the Tuple was modified between `GetTupleAndUndoLink` and `UpdateTupleAndUndoLink`.
+auto TransactionManager::Check(const TupleMeta &meta, const Tuple &tuple, RID rid, std::optional<UndoLink> undo_link)
+    -> bool {
+  if (undo_link.has_value() && undo_link->IsValid()) {
+    std::unique_lock<std::shared_mutex> l1(txn_map_mutex_);
+    auto txn = txn_map_[undo_link->prev_txn_];
+    return txn->read_ts_ >= meta.ts_;
+  }
+  return false;
+}
+
 }  // namespace bustub
+
+// NOLINTEND
 
 /**
  * @details about GC
- * 
+ *
  * gc需要删除对所有事务不可见的undo_logs, 系统维护一个最低read-ts的水准线: `water_mark`
  * bustub中的gc仅仅将txn从txn_mgr的`txn_map_`中移除, 不需要相应地修改undo_logs.
- * 
+ *
  * bustub每个事务
- * 
- * 
+ *
+ *
  * 1. ts < water_mark
  * 2. 不是version中最后一个undo_log (遍历version chain时的终止条件是找到第一个read-ts>=ts)
  *
  * (FIX) case : `water_mark > tuple's ts` (which in the table_heap) drop all undo_logs
  * if `water_mark > txn->commit_ts_.load()` we drop this txn can cover the case
-*/
+ */

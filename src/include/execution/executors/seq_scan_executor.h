@@ -14,20 +14,21 @@
 
 #include <vector>
 
+#include "concurrency/transaction_manager.h"
+#include "execution/execution_common.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/seq_scan_plan.h"
-#include "execution/execution_common.h"
 #include "storage/table/tuple.h"
 
 namespace bustub {
 
 /**
  * The SeqScanExecutor executor executes a sequential table scan.
- * 
+ *
  * 顺序扫描`Next()`的输出为`tuple`和其对应的`RID`(record identifier)
  * 的"copy"
- * 
+ *
  * @warning 每个`tuple`应该检查`TupleMeta`中的字段`is_deleted_`, 如果
  * 为true那么不应该emit该`tuple`
  */
@@ -55,8 +56,7 @@ class SeqScanExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 
  private:
-  const SeqScanPlanNode *plan_;  /**< The sequential scan plan node to be executed */
+  const SeqScanPlanNode *plan_; /**< The sequential scan plan node to be executed */
   std::unique_ptr<TableIterator> iter_;
-
 };
 }  // namespace bustub

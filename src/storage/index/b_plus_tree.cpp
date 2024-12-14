@@ -142,7 +142,7 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key) {
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
   page_id_t cursor_pid = GetRootPageId();
-  if(cursor_pid == -1) {
+  if (cursor_pid == -1) {
     return {};
   }
   ReadPageGuard cursor_guard = bpm_->ReadPage(cursor_pid);

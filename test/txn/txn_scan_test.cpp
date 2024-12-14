@@ -250,29 +250,29 @@ TEST(TxnScanTest, CollectUndoLogTest) {  // NOLINT
   //   txn5@0 (4, 4.000000, _) ts=4
   //   txn1@3 (1, 1.000000, _) ts=1
 
-/*
-debug_hook: before verify scan
-RID=1/0 ts=1 tuple=(1, 1.000000, <NULL>)
-RID=1/1 ts=2 tuple=(2, 2.000000, <NULL>)
-  txn1@0 (1, 1.000000, _,) ts=1
-RID=1/2 ts=3 tuple=(3, 3.000000, <NULL>)
-  txn3@0 (2, 2.000000, _,) ts=2
-  txn1@1 (1, 1.000000, _,) ts=1
-RID=1/3 ts=3 tuple=(3, 3.000000, <NULL>)
-RID=1/4 ts=4 tuple=(4, 4.000000, <NULL>)
-  txn4@0 (3, 3.000000, _,) ts=3
-RID=1/5 ts=4 tuple=(2, 2.000000, <NULL>)
-  txn4@1 (2, 2.000000, _,) ts=2
-RID=1/6 ts=4 tuple=(4, 4.000000, <NULL>)
-  txn4@2 <del> ts=2
-  txn1@2 (1, 1.000000, <NULL>boolean_null,) ts=1
-RID=1/7 ts=2 tuple=(100, 100.000000, <NULL>)
-RID=1/8 ts=2 tuple=(100, 100.000000, <NULL>)
-  txn2@0 (1, 1.000000, _,) ts=1
-RID=1/9 ts=5 tuple=(400, 400.000000, <NULL>)
-  txn5@0 (4, 4.000000, _,) ts=4
-  txn1@3 (1, 1.000000, _,) ts=1
-*/
+  /*
+  debug_hook: before verify scan
+  RID=1/0 ts=1 tuple=(1, 1.000000, <NULL>)
+  RID=1/1 ts=2 tuple=(2, 2.000000, <NULL>)
+    txn1@0 (1, 1.000000, _,) ts=1
+  RID=1/2 ts=3 tuple=(3, 3.000000, <NULL>)
+    txn3@0 (2, 2.000000, _,) ts=2
+    txn1@1 (1, 1.000000, _,) ts=1
+  RID=1/3 ts=3 tuple=(3, 3.000000, <NULL>)
+  RID=1/4 ts=4 tuple=(4, 4.000000, <NULL>)
+    txn4@0 (3, 3.000000, _,) ts=3
+  RID=1/5 ts=4 tuple=(2, 2.000000, <NULL>)
+    txn4@1 (2, 2.000000, _,) ts=2
+  RID=1/6 ts=4 tuple=(4, 4.000000, <NULL>)
+    txn4@2 <del> ts=2
+    txn1@2 (1, 1.000000, <NULL>boolean_null,) ts=1
+  RID=1/7 ts=2 tuple=(100, 100.000000, <NULL>)
+  RID=1/8 ts=2 tuple=(100, 100.000000, <NULL>)
+    txn2@0 (1, 1.000000, _,) ts=1
+  RID=1/9 ts=5 tuple=(400, 400.000000, <NULL>)
+    txn5@0 (4, 4.000000, _,) ts=4
+    txn1@3 (1, 1.000000, _,) ts=1
+  */
 
   {
     ASSERT_TRUE(undo_logs_0_for_txn_to_inspect.has_value());
@@ -369,7 +369,7 @@ TEST(TxnScanTest, ScanTest) {  // NOLINT
   }
 
   TxnMgrDbg("ck1", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
-  
+
   auto txn2 = bustub->txn_manager_->Begin();
   ASSERT_EQ(txn2->GetReadTs(), 2);
 
@@ -471,13 +471,17 @@ RID=1/3 ts=6* <del>
 
   query = "SELECT a FROM maintable";
   fmt::println(stderr, "C: Verify txn2");
-  WithTxn(txn2, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {6}})); // <- you will need to fill in the answer
+  WithTxn(txn2,
+          QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {6}}));  // <- you will need to fill in the answer
   fmt::println(stderr, "D: Verify txn3");
-  WithTxn(txn3, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {3}, {5}})); // <- you will need to fill in the answer
+  WithTxn(txn3, QueryHideResult(*bustub, _var, _txn, query,
+                                IntResult{{2}, {3}, {5}}));  // <- you will need to fill in the answer
   fmt::println(stderr, "E: Verify txn4");
-  WithTxn(txn4, QueryHideResult(*bustub, _var, _txn, query, IntResult{{1}, {3}, {6}})); // <- you will need to fill in the answer
+  WithTxn(txn4, QueryHideResult(*bustub, _var, _txn, query,
+                                IntResult{{1}, {3}, {6}}));  // <- you will need to fill in the answer
   fmt::println(stderr, "F: Verify txn5");
-  WithTxn(txn5, QueryHideResult(*bustub, _var, _txn, query, IntResult{{2}, {3}, {6}})); // <- you will need to fill in the answer
+  WithTxn(txn5, QueryHideResult(*bustub, _var, _txn, query,
+                                IntResult{{2}, {3}, {6}}));  // <- you will need to fill in the answer
 }
 
 // NOLINTEND(bugprone-unchecked-optional-access))

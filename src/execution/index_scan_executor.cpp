@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 #include "execution/executors/index_scan_executor.h"
 
+// NOLINTBEGIN
+
 namespace bustub {
 IndexScanExecutor::IndexScanExecutor(ExecutorContext *exec_ctx, const IndexScanPlanNode *plan)
     : AbstractExecutor{exec_ctx}, plan_{plan}, pred_keys_at_{0} {
@@ -33,18 +35,18 @@ auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   }
 
   std::vector<RID> result{};
-  auto &index_ = exec_ctx_->GetCatalog()->GetIndex(plan_->index_oid_)->index_;
+  auto &index = exec_ctx_->GetCatalog()->GetIndex(plan_->index_oid_)->index_;
   auto txn = exec_ctx_->GetTransaction();
   auto txn_mgr = exec_ctx_->GetTransactionManager();
 
   while (pred_keys_at_ < plan_->pred_keys_.size()) {
     result.clear();
     auto &expr = plan_->pred_keys_[pred_keys_at_++];
-    std::vector<Value> values(index_->GetMetadata()->GetIndexColumnCount());
+    std::vector<Value> values(index->GetMetadata()->GetIndexColumnCount());
     // 暂时只用一列作为key
-    BUSTUB_ASSERT(index_->GetMetadata()->GetIndexColumnCount() == 1, "error IndexColumnCount");
-    values[0] = expr->Evaluate(nullptr, *index_->GetKeySchema());
-    index_->ScanKey({values, index_->GetKeySchema()}, &result, txn);
+    BUSTUB_ASSERT(index->GetMetadata()->GetIndexColumnCount() == 1, "error IndexColumnCount");
+    values[0] = expr->Evaluate(nullptr, *index->GetKeySchema());
+    index->ScanKey({values, index->GetKeySchema()}, &result, txn);
 
     if (!result.empty()) {
       auto &table_heap = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_)->table_;
@@ -80,11 +82,11 @@ auto IndexScanExecutor::NextScan(Tuple *tuple, RID *rid) -> bool {
 
 void IndexScanExecutor::InitIterator() {
   BUSTUB_ENSURE(plan_->pred_keys_.empty(), "Can't use iter!!!");
-  auto index_info_ = exec_ctx_->GetCatalog()->GetIndex(plan_->index_oid_);
-  auto tree_ = dynamic_cast<BPlusTreeIndexForTwoIntegerColumn *>(index_info_->index_.get());
-  switch (index_info_->index_type_) {
+  auto index_info = exec_ctx_->GetCatalog()->GetIndex(plan_->index_oid_);
+  auto tree = dynamic_cast<BPlusTreeIndexForTwoIntegerColumn *>(index_info->index_.get());
+  switch (index_info->index_type_) {
     case IndexType::BPlusTreeIndex: {
-      iter_ = tree_->GetBeginIterator();
+      iter_ = tree->GetBeginIterator();
       break;
     }
     case IndexType::HashTableIndex: {
@@ -105,3 +107,5 @@ void IndexScanExecutor::InitIterator() {
   }
 }
 }  // namespace bustub
+
+// NOLINTEND

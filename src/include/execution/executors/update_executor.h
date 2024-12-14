@@ -20,8 +20,10 @@
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/expressions/column_value_expression.h"
+#include "execution/expressions/constant_value_expression.h"
 #include "execution/plans/update_plan.h"
 
+#include "concurrency/transaction_manager.h"
 #include "storage/table/tuple.h"
 #include "type/value_factory.h"
 
@@ -80,6 +82,6 @@ class UpdateExecutor : public AbstractExecutor {
   const UpdatePlanNode *plan_;                       /** The update plan node to be executed */
   const TableInfo *table_info_;                      /** Metadata identifying the table that should be updated */
   std::unique_ptr<AbstractExecutor> child_executor_; /** The child executor to obtain value from */
-  std::vector<Tuple> tuple_buffer;
+  std::vector<Tuple> tuple_buffer_;
 };
 }  // namespace bustub

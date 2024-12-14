@@ -29,7 +29,7 @@ static constexpr size_t TUPLE_META_SIZE = 16;
 
 /**
  * TupleMeta format: timestamp `ts_` + flag `is_deleted`
-*/
+ */
 struct TupleMeta {
   /** the ts / txn_id of this tuple. In project 3, simply set it to 0. */
   timestamp_t ts_;
@@ -47,7 +47,7 @@ static_assert(sizeof(TupleMeta) == TUPLE_META_SIZE);
 
 /**
  * Tuple format: `rid` + `data_`
- * 
+ *
  * @example
  * +-----------------------------------+-------------------------------+
  * | FIXED-SIZE or VARIED-SIZED OFFSET | PAYLOAD OF VARIED-SIZED FIELD |

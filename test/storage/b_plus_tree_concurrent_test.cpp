@@ -438,7 +438,7 @@ void MixTest2Call() {
     }
 
     // Check all reserved keys exist
-    size = 0;    
+    size = 0;
 
     for (auto iter = tree.Begin(); iter != tree.End(); ++iter) {
       const auto &pair = *iter;

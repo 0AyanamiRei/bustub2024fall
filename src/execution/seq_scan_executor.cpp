@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOLINTBEGIN
+
 #include "execution/executors/seq_scan_executor.h"
 
 namespace bustub {
@@ -50,3 +52,5 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 }
 
 }  // namespace bustub
+
+// NOLINTEND

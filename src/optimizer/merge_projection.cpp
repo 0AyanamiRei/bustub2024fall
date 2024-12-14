@@ -57,14 +57,13 @@ auto Optimizer::OptimizeMergeProjection(const AbstractPlanNodeRef &plan) -> Abst
 
 }  // namespace bustub
 
-
 /******************************************
  * @example
  * 1. 删除冗余的projection
  *   Proj (a, b, c)
  *        |            ->     scan (a, b, c)
  *   scan (a, b, c)
- * 
+ *
  * 2. 其余情况都不能删除projection
  *   Proj (a, b)
  *        |

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOLINTBEGIN
+
 #pragma once
 
 #include <cstddef>
@@ -24,15 +26,15 @@
 #include "storage/table/tuple.h"
 
 /**
- * (TODO) 目前的局限是: 
+ * (TODO) 目前的局限是:
  * 1. 仅实现2-way merge sort
- * 2. 排序的数据也假设为定长的, 即不包含`VARCHAR` attributes 
-*/
+ * 2. 排序的数据也假设为定长的, 即不包含`VARCHAR` attributes
+ */
 
 namespace bustub {
 
 #define SORT_PAGE_HEADER 16
-#define VALUE_SIZE 24 // 不考虑变长, 那么一个Value的size就是24
+#define VALUE_SIZE 24  // 不考虑变长, 那么一个Value的size就是24
 #define RID_SIZE 8
 #define SORT_ENTRY_SIZE(KEY_VAL_NUMS, FIX_SIZE) (KEY_VAL_NUMS * VALUE_SIZE + RID_SIZE + FIX_SIZE)
 #define SORT_PAGE_CNT(KEY_VAL_NUMS, FIX_SIZE) \
@@ -42,32 +44,32 @@ namespace bustub {
  * Page to hold the intermediate data for external merge sort.
  *
  * Only fixed-length data will be supported in Fall 2024.
- * 
+ *
  * sort page format :
  * +--------+----------------------+-----+----------------------+
  * | HEADER | SortKey(1), Tuple(1) | ... | SortKey(n), Tuple(n) |
  * +--------+----------------------+-----+----------------------+
- * 
- * SortKey format: 
+ *
+ * SortKey format:
  * +----------+----------+----------------+
  * | Value(1) | Value(2) | ... | Value(n) |
  * +----------+----------+----------------+
- * 
+ *
  * Value format
  *     8      4       1       4      = 8 + 5(3) + 4(4) = 24bytes
  * +-------+-------+------+--------+
  * | union | union | bool | TypeId |
  * +-------+-------+------+--------+
- * 
+ *
  * Tuple format:
  *     8         n
  * +-------+---------------+
  * |  RID  | fix_size data |
  * +-------+---------------+
- * 
+ *
  */
 class SortPage {
-public:
+ public:
   SortPage() = default;
   void Init(uint32_t keys_val_nums, u_int32_t fix_size);
   auto IsFull() -> bool { return size_ >= max_size_; }
@@ -78,7 +80,8 @@ public:
   void Clear() { std::memset(data_, 0, SORT_ENTRY_SIZE(keys_val_nums_, fix_size_) * max_size_); }
   auto GetMaxSize() const -> uint32_t { return max_size_; }
   auto GetSize() const -> uint32_t { return size_; }
-private:
+
+ private:
   uint32_t size_;
   uint32_t max_size_;
   uint32_t keys_val_nums_;
@@ -91,18 +94,18 @@ private:
  * A data structure that holds the sorted tuples as a run during external merge sort.
  * Tuples might be stored in multiple pages, and tuples are ordered both within one page
  * and across pages.
- * 
+ *
  * (3,1) (6,2) (9,4) (8,7) (5,10)
- * 
+ *
  * (1,3) (2,6) (4,9) (7,8) (5,10) 1-page页内有序
- *     (1,2)      (4,7)    (5,10)    
+ *     (1,2)      (4,7)    (5,10)
  *     (3,6)      (8,9)           2-page跨页有序
- * 
+ *
  *          (1,2)          (5,10) 4-page跨页有序
  *          (3,4)
  *          (6,7)
  *          (8,9)
- * 
+ *
  *                 (1,2)          8-page跨页有序  4<=5<=8 排序完毕
  *                 (3,4)
  *                 (5,6)
@@ -113,10 +116,10 @@ class MergeSortRun {
  public:
   MergeSortRun() = default;
   MergeSortRun(std::vector<page_id_t> pages, BufferPoolManager *bpm) : pages_(std::move(pages)), bpm_(bpm) {}
-  MergeSortRun(MergeSortRun&& other) noexcept : pages_(std::move(other.pages_)), bpm_(other.bpm_) {
+  MergeSortRun(MergeSortRun &&other) noexcept : pages_(std::move(other.pages_)), bpm_(other.bpm_) {
     other.bpm_ = nullptr;
   }
-  MergeSortRun& operator=(MergeSortRun&& other) noexcept {
+  MergeSortRun &operator=(MergeSortRun &&other) noexcept {
     if (this != &other) {
       pages_ = std::move(other.pages_);
       bpm_ = other.bpm_;
@@ -124,24 +127,25 @@ class MergeSortRun {
     }
     return *this;
   }
-  MergeSortRun(const MergeSortRun&) = delete;
-  MergeSortRun& operator=(const MergeSortRun&) = delete;
+  MergeSortRun(const MergeSortRun &) = delete;
+  MergeSortRun &operator=(const MergeSortRun &) = delete;
 
   auto GetPageCount() -> size_t { return pages_.size(); }
 
   /** Iterator for iterating on the sorted tuples in one run. */
   class Iterator {
     friend class MergeSortRun;
+
    public:
     Iterator() = default;
     Iterator(uint32_t invalid, const MergeSortRun *run) : page_id_at_(invalid), cursor_(-1), run_(run){};
-    Iterator(Iterator&& other) noexcept : page_(std::move(other.page_)) {
+    Iterator(Iterator &&other) noexcept : page_(std::move(other.page_)) {
       page_id_at_ = other.page_id_at_;
       cursor_ = other.cursor_;
       run_ = other.run_;
       other.run_ = nullptr;
     }
-    Iterator& operator=(Iterator&& other) noexcept {
+    Iterator &operator=(Iterator &&other) noexcept {
       if (this != &other) {
         page_ = std::move(other.page_);
         page_id_at_ = other.page_id_at_;
@@ -151,7 +155,7 @@ class MergeSortRun {
       }
       return *this;
     }
-    
+
     void Init(const MergeSortRun *run);
     auto operator++() -> Iterator &;
     auto operator*() -> SortEntry;
@@ -173,11 +177,11 @@ class MergeSortRun {
   auto End() -> Iterator { return {static_cast<uint32_t>(pages_.size()), this}; }
 
   Iterator iter_;
+
  private:
   std::vector<page_id_t> pages_;
   [[maybe_unused]] BufferPoolManager *bpm_;
 };
-
 
 /**
  * ExternalMergeSortExecutor executes an external merge sort.
@@ -206,14 +210,16 @@ class ExternalMergeSortExecutor : public AbstractExecutor {
 
  private:
   /** Help Functions */
-  auto CreateSortedRuns () -> std::vector<page_id_t>;
-  auto MergeRuns (MergeSortRun &a, MergeSortRun &b) -> std::vector<page_id_t>;
+  auto CreateSortedRuns() -> std::vector<page_id_t>;
+  auto MergeRuns(MergeSortRun &a, MergeSortRun &b) -> std::vector<page_id_t>;
 
   const SortPlanNode *plan_;
   std::unique_ptr<AbstractExecutor> child_executor_;
-  TupleComparator cmp_; // 根据order_bys的内容来比较两个tuples
+  TupleComparator cmp_;  // 根据order_bys的内容来比较两个tuples
   page_id_t sort_page_id_;
   MergeSortRun runs_;
 };
 
 }  // namespace bustub
+
+// NOLINTEND

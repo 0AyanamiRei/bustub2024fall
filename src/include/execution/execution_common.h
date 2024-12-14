@@ -61,7 +61,7 @@ auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tupl
                      Transaction *txn, TransactionManager *txn_mgr) -> std::optional<std::vector<UndoLog>>;
 
 /** 获取当前事务可见的tuple版本 */
-auto GetReadableTuple(const Schema *schema, const RID rid, Transaction *txn, TableHeap *table_heap,
+auto GetReadableTuple(const Schema *schema, RID rid, Transaction *txn, TableHeap *table_heap,
                       TransactionManager *txn_mgr) -> std::optional<Tuple>;
 
 auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tuple *target_tuple, timestamp_t ts,
@@ -89,14 +89,14 @@ auto UndoLogToString(const Schema *schema, const UndoLog &log) -> std::string;
  * @note - case `txn_id_ != ts` indicate the tuple modified by a un-commit txn
  *         we still return false
  */
-inline auto CheckConflict_1(Transaction *txn, timestamp_t ts) -> bool {
+inline auto CheckConflict1(Transaction *txn, timestamp_t ts) -> bool {
   return !(txn->GetReadTs() >= ts || txn->GetTransactionTempTs() == ts);
 }
 
 inline auto IsPkeyIndex(const std::shared_ptr<bustub::IndexInfo> &index_info) { return index_info->is_primary_key_; }
 
-inline auto CheckConflict_2(const TupleMeta &meta, const Tuple &tuple, RID rid, std::optional<UndoLink>) -> bool {
-  return true;
+inline auto CheckConflict2(const TupleMeta &meta, const Tuple &table, RID rid) -> bool {
+  return meta.ts_ >= TXN_START_ID;
 }
 
 // TODO(P4): Add new functions as needed... You are likely need to define some more functions.

@@ -76,10 +76,10 @@ struct UndoLink {
  * - `tuple_`: The modified fields, delta data
  * - `ts_`: Timestamp of this undo log
  * - `prev_version_`: Undo log prev version
-*/
+ */
 struct UndoLog {
   bool is_deleted_;
-  std::vector<bool> modified_fields_; // C++: std::vector<bool>偏特化的实现, 需要特别注意 
+  std::vector<bool> modified_fields_;  // C++: std::vector<bool>偏特化的实现, 需要特别注意
   Tuple tuple_;
   timestamp_t ts_{INVALID_TS};
   UndoLink prev_version_{};

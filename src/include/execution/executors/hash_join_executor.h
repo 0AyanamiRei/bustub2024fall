@@ -83,8 +83,8 @@ class HashJoinExecutor : public AbstractExecutor {
 
  private:
   /**< Help functions */
-  auto GetLeftJoinKey (const Tuple *tuple) -> JoinKey;
-  auto GetRightJoinKey (const Tuple *tuple) -> JoinKey;
+  auto GetLeftJoinKey(const Tuple *tuple) -> JoinKey;
+  auto GetRightJoinKey(const Tuple *tuple) -> JoinKey;
 
   /** The HashJoin plan node to be executed. */
   const HashJoinPlanNode *plan_;

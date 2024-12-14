@@ -14,7 +14,7 @@ auto Watermark::AddTxn(timestamp_t read_ts) -> void {
   }
 
   /**< 更新map */
-  if (reads_ts_map_.count(read_ts)) {
+  if (reads_ts_map_.count(read_ts) != 0U) {
     reads_ts_map_[read_ts]++;
   } else {
     reads_ts_map_[read_ts] = 1;
@@ -27,7 +27,7 @@ auto Watermark::AddTxn(timestamp_t read_ts) -> void {
 auto Watermark::RemoveTxn(timestamp_t read_ts) -> void {
   BUSTUB_ENSURE(reads_ts_map_.count(read_ts) > 0, "error remove, maybe txn inconsistent");
   /** 更新map */
-  if (!(--reads_ts_map_[read_ts])) {
+  if ((--reads_ts_map_[read_ts]) == 0) {
     reads_ts_map_.erase(read_ts);
     reads_ts_set_.erase(read_ts);
     if (read_ts == watermark_) {

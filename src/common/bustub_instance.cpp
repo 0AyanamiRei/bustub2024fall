@@ -59,7 +59,8 @@ BusTubInstance::BusTubInstance(const std::filesystem::path &db_file_name, size_t
   // We need more frames for GenerateTestTable to work. Therefore, we use 128 instead of the default
   // buffer pool size specified in `config.h`.
   try {
-    buffer_pool_manager_ = std::make_unique<BufferPoolManager>(bpm_size, disk_manager_.get(), LRUK_REPLACER_K, log_manager_.get());
+    buffer_pool_manager_ =
+        std::make_unique<BufferPoolManager>(bpm_size, disk_manager_.get(), LRUK_REPLACER_K, log_manager_.get());
   } catch (NotImplementedException &e) {
     std::cerr << "BufferPoolManager is not implemented, only mock tables are supported." << std::endl;
     buffer_pool_manager_ = nullptr;
@@ -285,7 +286,7 @@ auto BusTubInstance::ExecuteSqlTxn(const std::string &sql, ResultWriter &writer,
   bustub::Binder binder(*catalog_);
   binder.ParseAndSave(sql);
   l.unlock();
-  
+
   /**< 开始执行? @todo 查看statement的结构 */
   for (auto *stmt : binder.statement_nodes_) {
     auto statement = binder.BindStatement(stmt);

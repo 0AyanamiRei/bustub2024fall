@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOLINTBEGIN
+
 #pragma once
 
 #include <memory>
@@ -45,7 +47,7 @@ class SimpleAggregationHashTable {
   /** @return The initial aggregate value for this aggregation executor */
   auto GenerateInitialAggregateValue() -> AggregateValue {
     std::vector<Value> values{};
-    for (int i = 0; i < static_cast<int>(agg_types_.size()); i ++) {
+    for (int i = 0; i < static_cast<int>(agg_types_.size()); i++) {
       switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
           // Count start starts at zero.
@@ -85,33 +87,33 @@ class SimpleAggregationHashTable {
           result->aggregates_[i] = result->aggregates_[i].Add(Value{TypeId::INTEGER, 1});
           break;
         case AggregationType::CountAggregate:
-          if(!input.aggregates_[i].IsNull()) {
+          if (!input.aggregates_[i].IsNull()) {
             result->aggregates_[i] = result->aggregates_[i].Add(Value{TypeId::INTEGER, 1});
           }
           break;
         case AggregationType::SumAggregate:
-          if(result->aggregates_[i].IsNull()) { /**< 第一次更新 */
+          if (result->aggregates_[i].IsNull()) { /**< 第一次更新 */
             result->aggregates_[i] = input.aggregates_[i];
           } else {
-            if(!input.aggregates_[i].IsNull()) {
+            if (!input.aggregates_[i].IsNull()) {
               result->aggregates_[i] = result->aggregates_[i].Add(input.aggregates_[i]);
             }
           }
           break;
         case AggregationType::MinAggregate:
-          if(result->aggregates_[i].IsNull()) { /**< 第一次更新 */
+          if (result->aggregates_[i].IsNull()) { /**< 第一次更新 */
             result->aggregates_[i] = input.aggregates_[i];
           } else {
-            if(!input.aggregates_[i].IsNull()) {
+            if (!input.aggregates_[i].IsNull()) {
               result->aggregates_[i] = result->aggregates_[i].Min(input.aggregates_[i]);
             }
           }
           break;
         case AggregationType::MaxAggregate:
-          if(result->aggregates_[i].IsNull()) { /**< 第一次更新 */
+          if (result->aggregates_[i].IsNull()) { /**< 第一次更新 */
             result->aggregates_[i] = input.aggregates_[i];
           } else {
-            if(!input.aggregates_[i].IsNull()) {
+            if (!input.aggregates_[i].IsNull()) {
               result->aggregates_[i] = result->aggregates_[i].Max(input.aggregates_[i]);
             }
           }
@@ -248,3 +250,5 @@ class AggregationExecutor : public AbstractExecutor {
   bool first_;
 };
 }  // namespace bustub
+
+// NOLINTEND

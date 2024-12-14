@@ -16,10 +16,12 @@
 #include <utility>
 #include <vector>
 
+#include "execution/execution_common.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/delete_plan.h"
-#include "execution/execution_common.h"
+
+#include "concurrency/transaction_manager.h"
 #include "storage/table/tuple.h"
 
 namespace bustub {
@@ -59,6 +61,6 @@ class DeleteExecutor : public AbstractExecutor {
  private:
   const DeletePlanNode *plan_;
   std::unique_ptr<AbstractExecutor> child_executor_;
-  bool first_use_;
+  bool first_use_{true};
 };
 }  // namespace bustub

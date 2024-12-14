@@ -91,13 +91,13 @@ class FrameHeader {
 
 /**
  * @brief 缓冲池组件类, 负责在主存中的缓冲区和持久存储之间来回移动数据
- * 
+ *
  * - `LRUKReplacer`提供淘汰策略, 将未使用或者cold-page逐出缓冲区
- * 
+ *
  * - `DiskManager`提供持久化存储, 即读写磁盘的服务
- * 
+ *
  * - `LogManager`提供容错, 故障恢复等服务
- * 
+ *
  * @todo 探索淘汰策略, 加入淘汰优先级, 淘汰模式选项等功能
  * @todo 加入预取(Prefetch), 旁路缓冲(Bypass)等常规优化技术
  * @todo 探索更多工作负载下的缓冲池性能
