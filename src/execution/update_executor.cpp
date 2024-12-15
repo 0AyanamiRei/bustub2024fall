@@ -160,9 +160,36 @@ auto UpdateExecutor::Next(Tuple *tuple, RID *rid) -> bool {
       } else {
         //! Otherwise, we just need to update the tuple in the heap,
         //! Carefully, we need to update the rigth place with the result[0].
-        txn->AppendWriteSet(table_info_->oid_, result[0]);
         tuple->SetRid(result[0]);
-        table_info_->table_->UpdateTupleInPlace({txn->GetTransactionTempTs(), false}, *tuple, tuple->GetRid());
+        auto write_set = txn->GetWriteSets();
+        auto iter = write_set[plan_->table_oid_].find(tuple->GetRid());
+
+        if (iter == write_set[plan_->table_oid_].end()) {
+          auto page_write_guard = table_info_->table_->AcquireTablePageWriteLock(tuple->GetRid());
+          auto page = page_write_guard.AsMut<TablePage>();
+          auto [base_meta, base_tuple] = page->GetTuple(tuple->GetRid());
+          auto prev_link = txn_mgr->GetUndoLink(tuple->GetRid());
+
+          //! 该rid处的tuple没有被上轮标记, 需要检查是否其他txn插入
+          //! 同时检查该tuple是否为tomb, 否则主键冲突
+          //! 此后不需要再带锁了
+          {
+            if (base_meta.ts_ > txn->GetReadTs() || !base_meta.is_deleted_) {
+              txn->SetTainted();
+              throw ExecutionException("Write conflict during updating");
+            }
+          }
+
+          //! Txn first update the tuple
+          txn->AppendWriteSet(plan_->table_oid_, result[0]);
+          auto undo_log = UndoLog{true, {}, {}, base_meta.ts_, prev_link.has_value() ? *prev_link : UndoLink{}};
+          auto undo_link = txn->AppendUndoLog(undo_log);
+          page->UpdateTupleInPlaceUnsafe({txn->GetTransactionTempTs(), false}, *tuple, tuple->GetRid());
+          txn_mgr->UpdateUndoLink(tuple->GetRid(), undo_link);
+          page_write_guard.Drop();
+        } else {
+          table_info_->table_->UpdateTupleInPlace({txn->GetTransactionTempTs(), false}, *tuple, tuple->GetRid());
+        }
       }
     }
   } else {

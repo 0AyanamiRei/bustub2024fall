@@ -99,7 +99,6 @@ void TransactionManager::Abort(Transaction *txn) {
 
   // TODO(fall2023): Implement the abort logic!
   for (auto rid : txn->GetWriteSets()) {
-    
   }
 
   std::unique_lock<std::shared_mutex> lck(txn_map_mutex_);

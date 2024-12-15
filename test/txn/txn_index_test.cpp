@@ -260,6 +260,7 @@ TEST(TxnIndexTest, UpdatePrimaryKeyTest) {  // NOLINT
   TxnMgrDbg("after txn2 update", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
   auto txn3 = BeginTxn(*bustub, "txn3");
   WithTxn(txn3, ExecuteTxn(*bustub, _var, _txn, "UPDATE maintable SET col1 = col1 - 2"));
+  TxnMgrDbg("temp", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
   WithTxn(txn3, QueryShowResult(*bustub, _var, _txn, query, IntResult{{0, 0}, {1, 0}, {2, 0}, {3, 0}}));
   WithTxn(txn3, QueryIndex(*bustub, _var, _txn, query, "col1", std::vector<int>{0, 1, 2, 3, 4, 5},
                            IntResult{{0, 0}, {1, 0}, {2, 0}, {3, 0}, {}, {}}));
@@ -289,8 +290,24 @@ TEST(TxnIndexTest, HiddenUpdatePrimaryKeyTest) {  // NOLINT
     WithTxn(txn2, ExecuteTxn(*bustub, _var, _txn, "UPDATE maintable SET col1 = col1 + 1"));
     WithTxn(txn2, CommitTxn(*bustub, _var, _txn));
     TxnMgrDbg("after txn2 update", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
+    /*
+    RID=3/0 ts=5  <del>
+      txn6@0 ts=4 (1, 0)
+    ----------------------------------------------
+    RID=3/1 ts=5  (2, 0)
+      txn6@1 ts=4 (2, 0)
+    ----------------------------------------------
+    RID=3/2 ts=5  (3, 0)
+      txn6@2 ts=4 (3, 0)
+    ----------------------------------------------
+    RID=3/3 ts=5  (4, 0)
+      txn6@3 ts=4 (4, 0)
+    ----------------------------------------------
+    RID=3/4 ts=5  (5, 0)
+    ----------------------------------------------
+    */
   }
-
+  // read-ts = 5 => {(2,0)(3,0)(4,0)(5,0)}
   auto txn2_reverify = BeginTxn(*bustub, "txn2_reverify");
   auto txn3 = BeginTxn(*bustub, "txn3");
 
@@ -322,7 +339,7 @@ TEST(TxnIndexTest, HiddenUpdatePrimaryKeyTest) {  // NOLINT
   auto txn6 = BeginTxn(*bustub, "txn6");
 
   {
-    WithTxn(txn6, ExecuteTxnTainted(*bustub, _var, _txn, "UPDATE maintable SET col1 = col1, col2 = 1"));
+    WithTxn(txn6, ExecuteTxnTainted(*bustub, _var, _txn, "UPDATE maintable SET col1 = 1"));
     TxnMgrDbg("after txn6 update", bustub->txn_manager_.get(), table_info.get(), table_info->table_.get());
   }
 
@@ -332,7 +349,6 @@ TEST(TxnIndexTest, HiddenUpdatePrimaryKeyTest) {  // NOLINT
     (void)txn3_reverify;
     (void)txn4_reverify;
     (void)txn5_reverify;
-
   }
 }
 
