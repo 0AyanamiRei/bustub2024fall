@@ -101,7 +101,7 @@ class TablePage {
   using TupleInfo = std::tuple<uint16_t, uint16_t, TupleMeta>;
   char page_start_[0];
   page_id_t next_page_id_;
-  uint16_t num_tuples_;
+  uint16_t num_tuples_;  // has how many tuples in use
   uint16_t num_deleted_tuples_;
   TupleInfo tuple_info_[0];
 

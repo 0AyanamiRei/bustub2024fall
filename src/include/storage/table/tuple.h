@@ -128,7 +128,7 @@ class Tuple {
   auto GetDataPtr(const Schema *schema, uint32_t column_idx) const -> const char *;
 
   RID rid_{};  // if pointing to the table heap, the rid is valid
-  std::vector<char> data_;
+  std::vector<char> data_; // tuple被设计成可变长
 };
 
 }  // namespace bustub

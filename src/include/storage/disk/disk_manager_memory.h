@@ -37,6 +37,7 @@ namespace bustub {
 /**
  * DiskManagerMemory replicates the utility of DiskManager on memory. It is primarily used for
  * data structure performance testing.
+ * 一个简易的内存磁盘管理器, 通过一个固定大小的内存块模拟磁盘存储
  */
 class DiskManagerMemory : public DiskManager {
  public:
@@ -47,6 +48,7 @@ class DiskManagerMemory : public DiskManager {
   /**
    * This function should increase the disk space, but since we have a fixed amount of memory we just check that the
    * pages are in bounds.
+   * 此方法的设计目的是增加磁盘空间，但由于内存是固定大小的，它仅检查页数是否在范围内。
    */
   void IncreaseDiskSpace(size_t pages) override;
 
@@ -66,12 +68,13 @@ class DiskManagerMemory : public DiskManager {
 
  private:
   size_t pages_;
-  char *memory_;
+  char *memory_; // page dir 通过 offset = pid * PAGE_SIZE
 };
 
 /**
  * DiskManagerMemory replicates the utility of DiskManager on memory. It is primarily used for
  * data structure performance testing.
+ * 更复杂的内存磁盘管理器，支持动态扩展内存空间
  */
 class DiskManagerUnlimitedMemory : public DiskManager {
  public:
@@ -85,6 +88,7 @@ class DiskManagerUnlimitedMemory : public DiskManager {
 
   /**
    * This function should increase the disk space, but since this is memory we just resize the vector.
+   * 用in-memory 操作模拟增加磁盘空间
    */
   void IncreaseDiskSpace(size_t pages) override {
     std::scoped_lock l(mutex_);
@@ -215,7 +219,7 @@ class DiskManagerUnlimitedMemory : public DiskManager {
 
   std::mutex mutex_;
   std::optional<std::thread::id> thread_id_;
-  std::vector<std::shared_ptr<ProtectedPage>> data_;
+  std::vector<std::shared_ptr<ProtectedPage>> data_; // page dir ?
 
   size_t pages_{DEFAULT_DB_IO_SIZE};
 };

@@ -28,8 +28,8 @@ using SchemaRef = std::shared_ptr<const Schema>;
 
 /**
  * Schema format
- * - `columns_`: inline attributions
- * - `uninlined_columns_`: uninlined attributions
+ * - columns_: inline attributions
+ * - uninlined_columns_: uninlined attributions
  */
 class Schema {
  public:
