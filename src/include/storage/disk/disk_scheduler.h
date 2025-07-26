@@ -74,6 +74,6 @@ class DiskScheduler {
   // std::mutex lock_;
   DiskManager *disk_manager_ __attribute__((__unused__));
   Channel<std::optional<DiskRequest>> request_queue_[bk_threads];
-  std::vector<std::optional<std::thread>> background_threads_;
+  std::optional<std::thread> background_thread_;
 };
 }  // namespace bustub
