@@ -26,7 +26,30 @@ namespace bustub {
  *         `std::thread`对象
  */
 DiskScheduler::DiskScheduler(DiskManager *disk_manager) : disk_manager_(disk_manager) {
-  background_thread_.emplace([&] { StartWorkerThread(); });
+  background_threads_.reserve(bk_threads);
+  for(int i = 0; i < bk_threads; i ++) {
+    background_threads_.emplace_back([i, request_queue = &request_queue_[i], this] {
+      for (;;) {
+        auto r = request_queue->Get();
+        if (r == std::nullopt) {
+          return;
+        }
+        auto page_id = r.value().page_id_;
+        auto data = r.value().data_;
+        auto is_write = r.value().is_write_;
+        if (is_write) {
+          disk_manager_->WritePage(page_id, data);
+        } else {
+          disk_manager_->ReadPage(page_id, data);
+        }
+        r.value().callback_.set_value(true);
+      }
+    });
+  }
+
+  for (auto &thread : background_threads_) {
+    thread->join();
+  }
 }
 
 DiskScheduler::~DiskScheduler() {
@@ -34,9 +57,8 @@ DiskScheduler::~DiskScheduler() {
     r.Put(std::nullopt);
   }
 
-  if (background_thread_.has_value()) {
-    background_thread_->join();
-  }
+  
+
 }
 
 /**
@@ -53,44 +75,6 @@ void DiskScheduler::Schedule(DiskRequest r) {
 
   auto index = r.page_id_ % bk_threads;
   request_queue_[index].Put(std::move(r));
-}
-
-/**
- * @brief 实际处理磁盘请求的"后台线程"
- *
- * @note - 永不退出, 直到该对象调用了析构函数
- * @note - 调用`Get()`从请求队列中`request_queue_`获取请求并处理, 这里没有对每个请求开线程处理
- *
- * @warning - 需要在任务结束后使用回调机制:`callback_`
- */
-void DiskScheduler::StartWorkerThread() {
-  std::vector<std::thread> threads;
-
-  for (auto &request : request_queue_) {
-    threads.emplace_back([&request, this] {
-      for (;;) {
-        // printf("request_queie size : %d\n", request.Size());
-        auto r = request.Get();
-        if (r == std::nullopt) {
-          return;
-        }
-        auto page_id = r.value().page_id_;
-        auto data = r.value().data_;
-        auto is_write = r.value().is_write_;
-        if (is_write) {
-          disk_manager_->WritePage(page_id, data);
-        } else {
-          disk_manager_->ReadPage(page_id, data);
-        }
-
-        r.value().callback_.set_value(true);
-      }
-    });
-  }
-
-  for (auto &thread : threads) {
-    thread.join();
-  }
 }
 
 }  // namespace bustub
