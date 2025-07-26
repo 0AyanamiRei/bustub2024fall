@@ -135,7 +135,7 @@ class BufferPoolManager {
   LogManager *log_manager_ __attribute__((__unused__));
 
   void ReadDisk(std::shared_ptr<FrameHeader> &frame);
-  auto WriteDisk(char *data, page_id_t page_id, frame_id_t frame_id) -> std::optional<std::future<bool>>;
+  auto WriteDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>>;
   void SetFrame(std::shared_ptr<FrameHeader> &frame, frame_id_t &frame_id, page_id_t &page_id, AccessType &access_type);
 };
 }  // namespace bustub
