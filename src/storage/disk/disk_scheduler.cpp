@@ -25,25 +25,26 @@ namespace bustub {
  * @note - `std::optional::emplace`, 成员函数, 它在`background_thread_`中直接构造了一个新的
  *         `std::thread`对象
  */
-DiskScheduler::DiskScheduler(DiskManager *disk_manager, int num_frames_) : disk_manager_(disk_manager) {
-  for (int i = 0; i < num_frames_; i ++) {
-    request_queues_.emplace_back(Channel<std::optional<DiskRequest>>());
-    background_threads_.emplace_back([i, this, request_queues = &request_queues_[i]] () {
-      while(!_close) {
-        auto r = request_queues->Get();
+DiskScheduler::DiskScheduler(DiskManager *disk_manager, int num_frames_)
+    : disk_manager_(disk_manager) {
+  request_queues_.reserve(num_frames_);
+  background_threads_.reserve(num_frames_);
+  for (int i = 0; i < num_frames_; ++i) {
+    request_queues_.emplace_back(std::make_unique<Channel<std::optional<DiskRequest>>>());
+    background_threads_.emplace_back([i, this]() {
+      auto& queue = request_queues_[i];
+      while (!_close) {
+        auto r = queue.Get();
         if (r.has_value()) {
-          auto page_id = r->page_id_;
-          auto data = r->data_;
-          auto is_write = r->is_write_;
-          if (is_write) {
-            disk_manager_->WritePage(page_id, data);
+          if (r->is_write_) {
+            disk_manager_->WritePage(r->page_id_, r->data_);
           } else {
-            disk_manager_->ReadPage(page_id, data);
+            disk_manager_->ReadPage(r->page_id_, r->data_);
           }
-
-          r->callback_.set_value(true); // 通知等待request的线程
+          r->callback_.set_value(true);
+        } else {
+          return;
         }
-        return;
       }
     });
   }

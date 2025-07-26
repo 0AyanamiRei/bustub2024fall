@@ -25,10 +25,11 @@ namespace bustub {
 
 
 struct DiskRequest {
+  page_id_t page_id_;
+  size_t data_sz;
+  std::promise<bool> callback_;
   bool is_write_;
   char *data_;
-  page_id_t page_id_;
-  std::promise<bool> callback_;
 };
 
 

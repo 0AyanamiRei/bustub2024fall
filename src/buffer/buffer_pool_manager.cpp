@@ -102,7 +102,7 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
   auto promise = disk_scheduler_->CreatePromise();
   auto future = promise.get_future();
 
-  disk_scheduler_->Schedule({true, frame->GetDataMut(), page_id, std::move(promise)});
+  disk_scheduler_->Schedule({page_id, frame->data_.size(), std::move(promise), WRITE, frame->GetDataMut()}, frame->frame_id_);
 
   while (!future.get()) {
   }
@@ -263,28 +263,6 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
   // check dirty
   std::future<bool> write_future;
   std::thread write_thread;
-  if (frame->is_dirty_) {
-    // 脏页需要从frame中写回去  io_r1
-    write_thread = std::thread([frame, this, access_type]() {
-      frame->RLatch();
-      frame->pin_count_++;
-      replacer_->RecordAccess(frame->frame_id_, access_type);
-      replacer_->SetEvictable(frame->frame_id_, false);
-
-      auto write_future = WriteToDisk(frame->GetDataMut(), frame->page_id_, frame->frame_id_);
-      write_future.wait();
-    });
-  }
-
-
-  std::thread read_thread([frame, page_id, this]() {
-    frame->WLatch(); // 拿到写锁开始 不再允许新的读旧page_id线程加入
-    frame->page_id_ = page_id;
-    frame->is_dirty_ = false;
-    // 新页需要读入到frame io_r2
-    auto read_future = ReadFromDisk(frame->GetDataMut(), frame->page_id_, frame->frame_id_);
-    read_future.wait();
-  });
 
   //****************************************//
   // 现在的问题是, 额外开的线程能拿着写锁, 
@@ -328,6 +306,111 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
   // return std::nullopt;
 }
 
+auto BufferPoolManager::SyncGetWritePage(page_id_t page_id, AccessType access_type)
+    -> std::optional<WritePageGuard> {
+  if (page_id == INVALID_PAGE_ID) {
+    return std::nullopt;
+  }
+
+  std::lock_guard<std::mutex> lock(*bpm_latch_);
+  access_cnt_++;
+
+  if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
+    auto frame = this->frames_[p2f->second];
+    frame->pin_count_++;
+    replacer_->RecordAccess(frame->frame_id_, access_type);
+    replacer_->SetEvictable(frame->frame_id_, false); // 语义上应该包含在RecordAccess
+    return WritePageGuard(page_id, frame, replacer_, bpm_latch_);
+  }
+
+  bool is_evict;
+  auto frame = GetFrame(is_evict);
+  // 修改replacer_端
+  {
+    replacer_->RecordAccess(frame->frame_id_, access_type);
+    replacer_->SetEvictable(frame->frame_id_, false); // 语义上应该包含在RecordAccess
+  }
+
+  {
+    page_table_[page_id] = frame->frame_id_;
+    page_table_.erase(frame->page_id_);
+  }
+  // check dirty
+  if (frame->is_dirty_) {
+    WriteToDisk(frame->GetDataMut(), frame->data_.size(), frame->page_id_, frame->frame_id_);
+  }
+  // read任务自动reset page
+  auto read_future = ReadFromDisk(frame->GetDataMut(), frame->data_.size() , frame->page_id_, frame->frame_id_);
+  
+  // 同一个frame的读写排队 先添加WriteToDisk, 再添加ReadFromDisk 只需要等待read
+  if (read_future.has_value()) {
+    read_future->wait();
+  }
+
+  frame->pin_count_++;
+  frame->is_dirty_ = false;
+  frame->page_id_ = page_id;
+
+  return WritePageGuard(page_id, frame, replacer_, bpm_latch_);
+}
+
+auto BufferPoolManager::SyncGetReadPage(page_id_t page_id, AccessType access_type)
+    -> std::optional<ReadPageGuard> {
+  if (page_id == INVALID_PAGE_ID) {
+    return std::nullopt;
+  }
+
+  std::lock_guard<std::mutex> lock(*bpm_latch_);
+  access_cnt_++;
+
+  if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
+    auto frame = this->frames_[p2f->second];
+    frame->pin_count_++;
+    replacer_->RecordAccess(frame->frame_id_, access_type);
+    replacer_->SetEvictable(frame->frame_id_, false); // 语义上应该包含在RecordAccess
+    return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
+  }
+
+  bool is_evict;
+  auto frame = GetFrame(is_evict);
+  // 修改replacer_端
+  {
+    replacer_->RecordAccess(frame->frame_id_, access_type);
+    replacer_->SetEvictable(frame->frame_id_, false); // 语义上应该包含在RecordAccess
+  }
+
+  {
+    page_table_[page_id] = frame->frame_id_;
+    page_table_.erase(frame->page_id_);
+  }
+  // check dirty
+  if (frame->is_dirty_) {
+    WriteToDisk(frame->GetDataMut(), frame->data_.size(), frame->page_id_, frame->frame_id_);
+  }
+  // read任务自动reset page
+  auto read_future = ReadFromDisk(frame->GetDataMut(), frame->data_.size(), frame->page_id_, frame->frame_id_);
+  
+  // 同一个frame的读写排队 先添加WriteToDisk, 再添加ReadFromDisk 只需要等待read
+  if (read_future.has_value()) {
+    read_future->wait();
+  }
+
+  frame->pin_count_++;
+  frame->is_dirty_ = false;
+  frame->page_id_ = page_id;
+
+  return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
+}
+
+auto BufferPoolManager::AyncGetWritePage(page_id_t page_id, AccessType access_type)
+    -> std::optional<WritePageGuard> {
+
+    }
+auto BufferPoolManager::AyncGetReadPage(page_id_t page_id, AccessType access_type)
+    -> std::optional<ReadPageGuard> {
+
+    }
+
 /**
  * @brief A wrapper around `CheckedWritePage` that unwraps the inner value if it exists.
  *
@@ -343,7 +426,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
  * @return WritePageGuard A page guard ensuring exclusive and mutable access to a page's data.
  */
 auto BufferPoolManager::WritePage(page_id_t page_id, AccessType access_type) -> WritePageGuard {
-  auto guard_opt = CheckedWritePage(page_id, access_type);
+  auto guard_opt = SyncGetWritePage(page_id, access_type);
 
   if (!guard_opt.has_value()) {
     fmt::println(stderr, "\n`CheckedWritePage` failed to bring in page {}\n", page_id);
@@ -368,7 +451,7 @@ auto BufferPoolManager::WritePage(page_id_t page_id, AccessType access_type) -> 
  * @return ReadPageGuard A page guard ensuring shared and read-only access to a page's data.
  */
 auto BufferPoolManager::ReadPage(page_id_t page_id, AccessType access_type) -> ReadPageGuard {
-  auto guard_opt = CheckedReadPage(page_id, access_type);
+  auto guard_opt = SyncGetReadPage(page_id, access_type);
 
   if (!guard_opt.has_value()) {
     fmt::println(stderr, "\n`CheckedReadPage` failed to bring in page {}\n", page_id);
@@ -411,17 +494,19 @@ auto BufferPoolManager::GetFrame(bool &is_evict) -> std::shared_ptr<FrameHeader>
   }
 }
 
-auto BufferPoolManager::ReadFromDisk(char *data, page_id_t page_id, frame_id_t frame_id) -> std::future<bool> {
+auto BufferPoolManager::ReadFromDisk(char *data, size_t data_sz, page_id_t page_id, frame_id_t frame_id)
+    -> std::optional<std::future<bool>> {
   auto promise = disk_scheduler_->CreatePromise();
   auto future = promise.get_future();
-  disk_scheduler_->Schedule({READ, data, page_id, std::move(promise)}, frame_id);
+  disk_scheduler_->Schedule({page_id, data_sz, std::move(promise), READ, data}, frame_id);
   return future;
 }
 
-auto BufferPoolManager::WriteToDisk(char *data, page_id_t page_id, frame_id_t frame_id) -> std::future<bool> {  // NOLINT
+auto BufferPoolManager::WriteToDisk(char *data, size_t data_sz, page_id_t page_id, frame_id_t frame_id)
+    -> std::optional<std::future<bool>> {  // NOLINT
   auto promise = disk_scheduler_->CreatePromise();
   auto future = promise.get_future();
-  disk_scheduler_->Schedule({WRITE, data, page_id, std::move(promise)}, frame_id);
+  disk_scheduler_->Schedule({page_id, data_sz, std::move(promise), WRITE, data}, frame_id);
   return future;
 }
 

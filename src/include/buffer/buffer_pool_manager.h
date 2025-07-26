@@ -34,9 +34,20 @@ namespace bustub {
 constexpr bool WRITE = true;
 constexpr bool READ = false;
 
+using Hash_lock = std::shared_ptr<std::mutex>;
+
 class BufferPoolManager;
 class ReadPageGuard;
 class WritePageGuard;
+
+enum latch_level_t {
+  SYNC_BPM,
+  SYNC_PAGE_HASH,    /* 哈希表锁 */
+  SYNC_FRAME,        /* 块互斥锁 */
+  SYNC_FLUSH_LIST,   /* 刷新列表互斥锁 */
+  SYNC_FREE_LIST,    /* 自由列表互斥锁 */
+  SYNC_LRU_LIST,     /* LRU列表互斥锁 */
+};
 
 /**
  * @brief A helper class for `BufferPoolManager` that manages a frame of memory and related metadata.
@@ -72,21 +83,20 @@ class FrameHeader {
   explicit FrameHeader(frame_id_t frame_id);
   
  private:
+  const frame_id_t frame_id_;
+
+  std::shared_ptr<std::mutex> frame_latch_;
+  int pin_count_;
+  bool is_dirty_;
+  page_id_t page_id_;  // For optimization 
+  std::condition_variable cv_;  // For optimization 
+
+  std::shared_mutex rwlatch_;
+  std::vector<char> data_;
+
   auto GetData() const -> const char *;
   auto GetDataMut() -> char *;
   void Reset();
-
-
-  const frame_id_t frame_id_;
-  std::shared_mutex rwlatch_;
-  std::atomic<size_t> pin_count_;
-  bool is_dirty_;
-  std::vector<char> data_;
-
-  // For optimization 
-  page_id_t page_id_;
-  std::condition_variable cv_;
-
   void WLatch() { rwlatch_.lock(); }
   void WUnLatch() { rwlatch_.unlock(); }
   void RLatch() { rwlatch_.lock_shared(); }
@@ -115,25 +125,38 @@ class BufferPoolManager {
   void FlushAllPages();
   auto GetPinCount(page_id_t page_id) -> std::optional<size_t>;
 
+  auto SyncGetWritePage(page_id_t page_id, AccessType access_type = AccessType::Unknown)
+      -> std::optional<WritePageGuard>;
+  auto SyncGetReadPage(page_id_t page_id, AccessType access_type = AccessType::Unknown) -> std::optional<ReadPageGuard>;
+
+  auto AyncGetWritePage(page_id_t page_id, AccessType access_type = AccessType::Unknown)
+      -> std::optional<WritePageGuard>;
+  auto AyncGetReadPage(page_id_t page_id, AccessType access_type = AccessType::Unknown) -> std::optional<ReadPageGuard>;
+  
   // 统计缓存命中率
   std::atomic<uint64_t> bpm_hint_{0};
   std::atomic<uint64_t> access_cnt_{0};
 
  private:
-  const size_t num_frames_;
   std::atomic<page_id_t> next_page_id_{0};
+  const size_t num_frames_;
   std::shared_ptr<std::mutex> bpm_latch_;
   std::vector<std::shared_ptr<FrameHeader>> frames_;
+
+  Hash_lock hash_latchs_;
   std::unordered_map<page_id_t, frame_id_t> page_table_;
 
+  std::shared_ptr<std::mutex> free_list_latch_;
   std::forward_list<frame_id_t> free_frames_;
+
   std::shared_ptr<LRUKReplacer> replacer_;
   std::unique_ptr<DiskScheduler> disk_scheduler_;
   LogManager *log_manager_ __attribute__((__unused__));
 
+  // 仅仅获得一个dirty的frame, 不对其做任何修改
   auto GetFrame(bool &is_evict) -> std::shared_ptr<FrameHeader>;
-  auto ReadFromDisk(char *data, page_id_t page_id, frame_id_t frame_id) -> std::future<bool>;
-  auto WriteToDisk(char *data, page_id_t page_id, frame_id_t frame_id) -> std::future<bool>;
+  auto ReadFromDisk(char *data, size_t data_sz, page_id_t page_id, frame_id_t frame_id) -> std::optional<std::future<bool>>;
+  auto WriteToDisk(char *data, size_t data_sz, page_id_t page_id, frame_id_t frame_id) -> std::optional<std::future<bool>>;
   void SetFrame(std::shared_ptr<FrameHeader> &frame, frame_id_t &frame_id, page_id_t &page_id, AccessType &access_type);
 };
 }  // namespace bustub
