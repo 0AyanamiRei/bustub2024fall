@@ -138,24 +138,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
 }
 
 auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_type) -> std::optional<WritePageGuard> {
-  if (page_id == INVALID_PAGE_ID) {
-    return std::nullopt;
-  }
-
-  std::lock_guard<std::mutex> lock(*bpm_latch_);
-  access_cnt_++;
-  
-  // check cached?
-  if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
-    // maybe we not need to check dirty if the page in frame
-    auto frame = this->frames_[p2f->second];
-    frame->pin_count_++;
-    replacer_->RecordAccess(frame->frame_id_, access_type);
-    // replacer_->SetEvictable(frame->frame_id_, false); 语义上应该包含在RecordAccess
-    return WritePageGuard(page_id, frame, replacer_, bpm_latch_);
-  } else { // not cached
-
-  }
+  return SyncGetWritePage(page_id, access_type);
 
 
   // if (page_table_.count(page_id) != 0U) {
@@ -230,42 +213,7 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
 }
 
 auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_type) -> std::optional<ReadPageGuard> {
-  if (page_id == INVALID_PAGE_ID) {
-    return std::nullopt;
-  }
-
-  std::unique_lock<std::mutex> lock(*bpm_latch_);
-  access_cnt_++;
-
-  // check cached?
-  if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
-    // maybe we not need to check dirty if the page in frame
-    auto frame = frames_[p2f->second];
-    if (page_id == frame->page_id_) {
-      frame->RLatch();
-      lock.unlock();
-      frame->pin_count_++;
-      replacer_->RecordAccess(frame->frame_id_, access_type);
-      // replacer_->SetEvictable(frame->frame_id_, false); 语义上应该包含在RecordAccess
-      return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
-    }
-  }
-  
-  // not cached
-  bool is_evict;
-  auto frame = GetFrame(is_evict);
-  //**********可能不用急着改, 在新的page load之前, 该frame上的page都是可读的***************// 
-  //******换句话说,对于frame的数据, 读的时候是在往磁盘写, 写的时候是在读入磁盘数据***********// 
-  // page_table_.erase(frame->page_id_); 我们应该是允许多个page_id 映射同一个frame的
-  page_table_[page_id] = frame->frame_id_;
-  frame->RLatch();
-  lock.unlock();
-  // check dirty
-  std::future<bool> write_future;
-  std::thread write_thread;
-
-  //****************************************//
-  // 现在的问题是, 额外开的线程能拿着写锁, 
+  return SyncGetReadPage(page_id, access_type);
 
 
 
@@ -312,7 +260,7 @@ auto BufferPoolManager::SyncGetWritePage(page_id_t page_id, AccessType access_ty
     return std::nullopt;
   }
 
-  std::lock_guard<std::mutex> lock(*bpm_latch_);
+  std::unique_lock<std::mutex> lock(*bpm_latch_);
   access_cnt_++;
 
   if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
@@ -320,11 +268,15 @@ auto BufferPoolManager::SyncGetWritePage(page_id_t page_id, AccessType access_ty
     frame->pin_count_++;
     replacer_->RecordAccess(frame->frame_id_, access_type);
     replacer_->SetEvictable(frame->frame_id_, false); // 语义上应该包含在RecordAccess
+    lock.unlock();
     return WritePageGuard(page_id, frame, replacer_, bpm_latch_);
   }
 
   bool is_evict;
   auto frame = GetFrame(is_evict);
+  if (frame == nullptr) {
+    return std::nullopt;
+  }
   // 修改replacer_端
   {
     replacer_->RecordAccess(frame->frame_id_, access_type);
@@ -332,15 +284,15 @@ auto BufferPoolManager::SyncGetWritePage(page_id_t page_id, AccessType access_ty
   }
 
   {
-    page_table_[page_id] = frame->frame_id_;
     page_table_.erase(frame->page_id_);
+    page_table_[page_id] = frame->frame_id_;
   }
   // check dirty
   if (frame->is_dirty_) {
     WriteToDisk(frame->GetDataMut(), frame->data_.size(), frame->page_id_, frame->frame_id_);
   }
   // read任务自动reset page
-  auto read_future = ReadFromDisk(frame->GetDataMut(), frame->data_.size() , frame->page_id_, frame->frame_id_);
+  auto read_future = ReadFromDisk(frame->GetDataMut(), frame->data_.size() , page_id, frame->frame_id_);
   
   // 同一个frame的读写排队 先添加WriteToDisk, 再添加ReadFromDisk 只需要等待read
   if (read_future.has_value()) {
@@ -351,6 +303,7 @@ auto BufferPoolManager::SyncGetWritePage(page_id_t page_id, AccessType access_ty
   frame->is_dirty_ = false;
   frame->page_id_ = page_id;
 
+  lock.unlock();
   return WritePageGuard(page_id, frame, replacer_, bpm_latch_);
 }
 
@@ -360,7 +313,7 @@ auto BufferPoolManager::SyncGetReadPage(page_id_t page_id, AccessType access_typ
     return std::nullopt;
   }
 
-  std::lock_guard<std::mutex> lock(*bpm_latch_);
+  std::unique_lock<std::mutex> lock(*bpm_latch_);
   access_cnt_++;
 
   if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
@@ -368,11 +321,15 @@ auto BufferPoolManager::SyncGetReadPage(page_id_t page_id, AccessType access_typ
     frame->pin_count_++;
     replacer_->RecordAccess(frame->frame_id_, access_type);
     replacer_->SetEvictable(frame->frame_id_, false); // 语义上应该包含在RecordAccess
+    lock.unlock();
     return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
   }
 
   bool is_evict;
   auto frame = GetFrame(is_evict);
+  if (frame == nullptr) {
+    return std::nullopt;
+  }
   // 修改replacer_端
   {
     replacer_->RecordAccess(frame->frame_id_, access_type);
@@ -388,7 +345,7 @@ auto BufferPoolManager::SyncGetReadPage(page_id_t page_id, AccessType access_typ
     WriteToDisk(frame->GetDataMut(), frame->data_.size(), frame->page_id_, frame->frame_id_);
   }
   // read任务自动reset page
-  auto read_future = ReadFromDisk(frame->GetDataMut(), frame->data_.size(), frame->page_id_, frame->frame_id_);
+  auto read_future = ReadFromDisk(frame->GetDataMut(), frame->data_.size(), page_id, frame->frame_id_);
   
   // 同一个frame的读写排队 先添加WriteToDisk, 再添加ReadFromDisk 只需要等待read
   if (read_future.has_value()) {
@@ -398,17 +355,17 @@ auto BufferPoolManager::SyncGetReadPage(page_id_t page_id, AccessType access_typ
   frame->pin_count_++;
   frame->is_dirty_ = false;
   frame->page_id_ = page_id;
-
+  lock.unlock();
   return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
 }
 
 auto BufferPoolManager::AyncGetWritePage(page_id_t page_id, AccessType access_type)
     -> std::optional<WritePageGuard> {
-
+      return std::nullopt;
     }
 auto BufferPoolManager::AyncGetReadPage(page_id_t page_id, AccessType access_type)
     -> std::optional<ReadPageGuard> {
-
+      return std::nullopt;
     }
 
 /**
@@ -480,18 +437,22 @@ auto BufferPoolManager::GetPinCount(page_id_t page_id) -> std::optional<size_t> 
   return pin_cnt;
 }
 
-
 auto BufferPoolManager::GetFrame(bool &is_evict) -> std::shared_ptr<FrameHeader> {
   std::shared_ptr<FrameHeader> frame;
-  if (is_evict = !frames_.empty(); is_evict) {
+  if (free_frames_.empty()) {
+    is_evict = true;
     auto frame_id_opt = replacer_->Evict();
-    BUSTUB_ASSERT(frame_id_opt.has_value(), "can not evict any frame");
+    if (!frame_id_opt.has_value()) {
+      return nullptr;
+    }
     frame = frames_[frame_id_opt.value()];
   } else {
+      is_evict = false;
       auto frame_id = free_frames_.front();
       free_frames_.pop_front();
       frame = frames_[frame_id];
   }
+  return frame;
 }
 
 auto BufferPoolManager::ReadFromDisk(char *data, size_t data_sz, page_id_t page_id, frame_id_t frame_id)
@@ -510,11 +471,4 @@ auto BufferPoolManager::WriteToDisk(char *data, size_t data_sz, page_id_t page_i
   return future;
 }
 
-void BufferPoolManager::SetFrame(std::shared_ptr<FrameHeader> &frame, frame_id_t &frame_id, page_id_t &page_id,
-                                 AccessType &access_type) {
-  frame->pin_count_++;
-  frame->page_id_ = page_id;
-  replacer_->RecordAccess(frame_id, access_type);
-  replacer_->SetEvictable(frame_id, false);
-}
 }  // namespace bustub

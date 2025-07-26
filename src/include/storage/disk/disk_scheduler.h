@@ -52,7 +52,7 @@ class DiskScheduler {
 
  private: 
   DiskManager *disk_manager_ __attribute__((__unused__));
-  std::vector<Channel<std::optional<DiskRequest>>> request_queues_;
+  Channel<std::optional<DiskRequest>> request_queues_[640];
   std::vector<std::thread> background_threads_;
   bool _close{false};
 };

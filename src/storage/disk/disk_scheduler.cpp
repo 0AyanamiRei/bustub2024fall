@@ -27,10 +27,8 @@ namespace bustub {
  */
 DiskScheduler::DiskScheduler(DiskManager *disk_manager, int num_frames_)
     : disk_manager_(disk_manager) {
-  request_queues_.reserve(num_frames_);
   background_threads_.reserve(num_frames_);
   for (int i = 0; i < num_frames_; ++i) {
-    request_queues_.emplace_back(std::make_unique<Channel<std::optional<DiskRequest>>>());
     background_threads_.emplace_back([i, this]() {
       auto& queue = request_queues_[i];
       while (!_close) {

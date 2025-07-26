@@ -157,7 +157,6 @@ class BufferPoolManager {
   auto GetFrame(bool &is_evict) -> std::shared_ptr<FrameHeader>;
   auto ReadFromDisk(char *data, size_t data_sz, page_id_t page_id, frame_id_t frame_id) -> std::optional<std::future<bool>>;
   auto WriteToDisk(char *data, size_t data_sz, page_id_t page_id, frame_id_t frame_id) -> std::optional<std::future<bool>>;
-  void SetFrame(std::shared_ptr<FrameHeader> &frame, frame_id_t &frame_id, page_id_t &page_id, AccessType &access_type);
 };
 }  // namespace bustub
 
