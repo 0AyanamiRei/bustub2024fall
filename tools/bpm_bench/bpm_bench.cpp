@@ -284,6 +284,7 @@ auto main(int argc, char **argv) -> int {
   }
 
   total_metrics.Report();
+  fmt::print("cache hint: {}/{}\n", bpm->bpm_hint_.load(), bpm->access_cnt_.load());
 
   return 0;
 }

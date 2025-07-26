@@ -68,7 +68,7 @@ class DiskManagerMemory : public DiskManager {
 
  private:
   size_t pages_;
-  char *memory_; // page dir 通过 offset = pid * PAGE_SIZE
+  char *memory_;  // page dir 通过 offset = pid * PAGE_SIZE
 };
 
 /**
@@ -219,7 +219,7 @@ class DiskManagerUnlimitedMemory : public DiskManager {
 
   std::mutex mutex_;
   std::optional<std::thread::id> thread_id_;
-  std::vector<std::shared_ptr<ProtectedPage>> data_; // page dir ?
+  std::vector<std::shared_ptr<ProtectedPage>> data_;  // page dir ?
 
   size_t pages_{DEFAULT_DB_IO_SIZE};
 };

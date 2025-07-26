@@ -47,7 +47,7 @@ auto TableHeap::InsertTuple(const TupleMeta &meta, const Tuple &tuple, LockManag
   auto page_guard = bpm_->WritePage(last_page_id_);
 
   // (TODO) may not need to use while(true)
-  while (true) { // why while(true)?
+  while (true) {  // why while(true)?
     auto page = page_guard.AsMut<TablePage>();
     if (page->GetNextTupleOffset(meta, tuple) != std::nullopt) {
       break;

@@ -14,7 +14,7 @@
 #pragma once
 
 #include <condition_variable>  // NOLINT(build/c++11)
-#include <list>
+#include <forward_list>
 #include <memory>
 #include <shared_mutex>
 #include <unordered_map>
@@ -30,6 +30,9 @@
 #include "common/logger.h"
 
 namespace bustub {
+
+constexpr bool WRITE = true;
+constexpr bool READ = false;
 
 class BufferPoolManager;
 class ReadPageGuard;
@@ -67,20 +70,21 @@ class FrameHeader {
 
  public:
   explicit FrameHeader(frame_id_t frame_id);
-
+  
  private:
   auto GetData() const -> const char *;
   auto GetDataMut() -> char *;
   void Reset();
 
-  bool is_dirty_;
+
   const frame_id_t frame_id_;
-  page_id_t page_id_;
   std::shared_mutex rwlatch_;
   std::atomic<size_t> pin_count_;
+  bool is_dirty_;
   std::vector<char> data_;
-  std::mutex io_lock_;
-  std::atomic<bool> io_done_;
+
+  // For optimization 
+  page_id_t page_id_;
   std::condition_variable cv_;
 
   void WLatch() { rwlatch_.lock(); }
@@ -89,19 +93,10 @@ class FrameHeader {
   void RUnLatch() { rwlatch_.unlock_shared(); }
 };
 
-/**
- * @brief 缓冲池组件类, 负责在主存中的缓冲区和持久存储之间来回移动数据
- *
- * - `LRUKReplacer`提供淘汰策略, 将未使用或者cold-page逐出缓冲区
- *
- * - `DiskManager`提供持久化存储, 即读写磁盘的服务
- *
- * - `LogManager`提供容错, 故障恢复等服务
- *
- * @todo 探索淘汰策略, 加入淘汰优先级, 淘汰模式选项等功能
- * @todo 加入预取(Prefetch), 旁路缓冲(Bypass)等常规优化技术
- * @todo 探索更多工作负载下的缓冲池性能
- */
+// 缓冲池组件类, 负责在主存中的缓冲区和持久存储之间来回移动数据
+// (TODO) 探索淘汰策略, 加入淘汰优先级, 淘汰模式选项等功能
+// (TODO) 加入预取(Prefetch), 旁路缓冲(Bypass)等常规优化技术
+// (TODO) 探索更多工作负载下的缓冲池性能
 class BufferPoolManager {
  public:
   BufferPoolManager(size_t num_frames, DiskManager *disk_manager, size_t k_dist = LRUK_REPLACER_K,
@@ -119,23 +114,26 @@ class BufferPoolManager {
   auto FlushPage(page_id_t page_id) -> bool;
   void FlushAllPages();
   auto GetPinCount(page_id_t page_id) -> std::optional<size_t>;
+
   // 统计缓存命中率
-  std::atomic<uint64_t> bpm_hint_;
-  std::atomic<uint64_t> access_cnt_;
+  std::atomic<uint64_t> bpm_hint_{0};
+  std::atomic<uint64_t> access_cnt_{0};
 
  private:
   const size_t num_frames_;
-  std::atomic<page_id_t> next_page_id_;
+  std::atomic<page_id_t> next_page_id_{0};
   std::shared_ptr<std::mutex> bpm_latch_;
   std::vector<std::shared_ptr<FrameHeader>> frames_;
   std::unordered_map<page_id_t, frame_id_t> page_table_;
-  std::list<frame_id_t> free_frames_;
+
+  std::forward_list<frame_id_t> free_frames_;
   std::shared_ptr<LRUKReplacer> replacer_;
   std::unique_ptr<DiskScheduler> disk_scheduler_;
   LogManager *log_manager_ __attribute__((__unused__));
 
-  void ReadDisk(std::shared_ptr<FrameHeader> &frame);
-  auto WriteDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>>;
+  auto GetFrame(bool &is_evict) -> std::shared_ptr<FrameHeader>;
+  auto ReadFromDisk(char *data, page_id_t page_id, frame_id_t frame_id) -> std::future<bool>;
+  auto WriteToDisk(char *data, page_id_t page_id, frame_id_t frame_id) -> std::future<bool>;
   void SetFrame(std::shared_ptr<FrameHeader> &frame, frame_id_t &frame_id, page_id_t &page_id, AccessType &access_type);
 };
 }  // namespace bustub

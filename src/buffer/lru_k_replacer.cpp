@@ -1,241 +1,222 @@
-//===----------------------------------------------------------------------===//
-//
-//                         BusTub
-//
-// lru_k_replacer.cpp
-//
-// Identification: src/buffer/lru_k_replacer.cpp
-//
-// Copyright (c) 2015-2022, Carnegie Mellon University Database Group
-//
-//===----------------------------------------------------------------------===//
-
-/*
-  锁策略是对外接口: Evict(), RecordAccess()这些一个函数整个过程都持latch_操作
-
-  内部使用的函数默认是带锁的情况下使用, 也就是被上面这些接口函数调用;
-*/
-
 #include "buffer/lru_k_replacer.h"
 #include "common/exception.h"
 
 namespace bustub {
 
-LRUKNode::LRUKNode()
-    : fid_(-1),
-      next_(nullptr),
-      prev_(nullptr),
-      accses_k_(-1),
-      is_evictable_(false),
+LRUKNode::LRUKNode() 
+    : fid_(-1), 
+      next_(nullptr), 
+      prev_(nullptr), 
+      access_count_(0), 
+      is_evictable_(false), 
       last_access_(AccessType::Unknown) {}
 
-LRUKNode::LRUKNode(frame_id_t fid, [[maybe_unused]] AccessType access_type)
-    : next_(nullptr), prev_(nullptr), accses_k_(1), is_evictable_(false), last_access_(access_type) {
-  fid_ = fid;
-}
+LRUKNode::LRUKNode(frame_id_t fid, AccessType access_type)
+    : fid_(fid), 
+      next_(nullptr), 
+      prev_(nullptr), 
+      access_count_(1), 
+      is_evictable_(false), 
+      last_access_(access_type) {}
 
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {
-  BUSTUB_ASSERT(num_frames > 0, "param to LRUKReplacer: num_frames <= 0");
-  BUSTUB_ASSERT(k > 0, "param to LRUKReplacer: k <= 0");
+  BUSTUB_ASSERT(num_frames > 0, "num_frames must be positive");
+  BUSTUB_ASSERT(k > 0, "k must be positive");
 
-  head_ = new LRUKNode();
-  tail_ = new LRUKNode();
-  scan_ = new LRUKNode();
-  kmid_ = new LRUKNode();
+  // 初始化热队列
+  hot_head_ = new LRUKNode();
+  hot_tail_ = new LRUKNode();
+  hot_head_->next_ = hot_tail_;
+  hot_tail_->prev_ = hot_head_;
 
-  head_->next_ = kmid_;
-  kmid_->next_ = tail_;
-  tail_->next_ = scan_;
-  scan_->prev_ = tail_;
-  tail_->prev_ = kmid_;
-  kmid_->prev_ = head_;
+  // 初始化冷队列
+  cold_head_ = new LRUKNode();
+  cold_tail_ = new LRUKNode();
+  cold_head_->next_ = cold_tail_;
+  cold_tail_->prev_ = cold_head_;
+
+  // 初始化扫描队列
+  scan_head_ = new LRUKNode();
+  scan_tail_ = new LRUKNode();
+  scan_head_->next_ = scan_tail_;
+  scan_tail_->prev_ = scan_head_;
 }
 
 LRUKReplacer::~LRUKReplacer() {
-  LRUKNode *temp = head_;
-  while (temp != scan_) {
-    LRUKNode *next_node = temp->next_;
+  // 清理热队列
+  LRUKNode *temp = hot_head_;
+  while (temp != hot_tail_) {
+    LRUKNode *next = temp->next_;
     delete temp;
-    temp = next_node;
+    temp = next;
   }
-  delete scan_;
-}
+  delete hot_tail_;
 
-void LRUKReplacer::Add2head(LRUKNode *temp) {
-  temp->next_ = head_->next_;
-  head_->next_->prev_ = temp;
-  head_->next_ = temp;
-  temp->prev_ = head_;
-}
-
-void LRUKReplacer::Add2tail(LRUKNode *temp) {
-  if (k_ == 1) { /** k_ = 1, LRU-K就等价于LRU */
-    Add2head(temp);
-    return;
+  // 清理冷队列
+  temp = cold_head_;
+  while (temp != cold_tail_) {
+    LRUKNode *next = temp->next_;
+    delete temp;
+    temp = next;
   }
-  tail_->prev_->next_ = temp;
-  temp->prev_ = tail_->prev_;
-  temp->next_ = tail_;
-  tail_->prev_ = temp;
+  delete cold_tail_;
+
+  // 清理扫描队列
+  temp = scan_head_;
+  while (temp != scan_tail_) {
+    LRUKNode *next = temp->next_;
+    delete temp;
+    temp = next;
+  }
+  delete scan_tail_;
 }
 
-void LRUKReplacer::AddAfterkmid(LRUKNode *temp) {
-  temp->next_ = kmid_->next_;
-  kmid_->next_ = temp;
-  temp->prev_ = kmid_;
-  temp->next_->prev_ = temp;
+void LRUKReplacer::AddToHotHead(LRUKNode *node) {
+  node->next_ = hot_head_->next_;
+  node->prev_ = hot_head_;
+  hot_head_->next_->prev_ = node;
+  hot_head_->next_ = node;
 }
 
-void LRUKReplacer::AddAftertail(LRUKNode *temp) {
-  temp->next_ = tail_->next_;
-  tail_->next_ = temp;
-  temp->prev_ = tail_;
-  temp->next_->prev_ = temp;
+void LRUKReplacer::AddToColdTail(LRUKNode *node) {
+  node->next_ = cold_tail_;
+  node->prev_ = cold_tail_->prev_;
+  cold_tail_->prev_->next_ = node;
+  cold_tail_->prev_ = node;
 }
 
-auto LRUKReplacer::MyRemove(LRUKNode *temp) -> LRUKNode * {
-  temp->prev_->next_ = temp->next_;
-  temp->next_->prev_ = temp->prev_;
-  return temp;
+void LRUKReplacer::AddToScanTail(LRUKNode *node) {
+  node->next_ = scan_tail_;
+  node->prev_ = scan_tail_->prev_;
+  scan_tail_->prev_->next_ = node;
+  scan_tail_->prev_ = node;
+}
+
+LRUKNode* LRUKReplacer::RemoveNode(LRUKNode *node) {
+  node->prev_->next_ = node->next_;
+  node->next_->prev_ = node->prev_;
+  return node;
 }
 
 auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
-  LRUKNode *temp = nullptr;
-  frame_id_t fid;
-  latch_.lock();
-  if (tail_->next_ != scan_) { /** 第三部分链表 按LIFO 从tail_->scan_ */
-    temp = tail_->next_;
-    while (temp != scan_) {
-      if (temp->is_evictable_) { /** 第三部分驱逐 */
-        fid = temp->fid_;
-        lruk_map_.erase(fid); /** 从哈希表中删除 */
-        MyRemove(temp);       /** 从链表中删除 */
-        delete temp;          /** 释放内存 */
-        curr_size_--;         /** 修改curr_size_的大小 */
-        latch_.unlock();      /** 退出前释放锁 */
-        return fid;
-      }
-      temp = temp->next_;
+  std::lock_guard<std::mutex> lock(latch_);
+
+  // 优先从扫描队列驱逐（LIFO，从尾部）
+  LRUKNode *temp = scan_tail_->prev_;
+  while (temp != scan_head_) {
+    if (temp->is_evictable_) {
+      frame_id_t fid = temp->fid_;
+      lruk_map_.erase(fid);
+      RemoveNode(temp);
+      delete temp;
+      curr_size_--;
+      return fid;
     }
+    temp = temp->prev_;
   }
 
-  if (kmid_->next_ != tail_) { /** 第二部分链表 按FIFO 从kmid_->tail_ */
-    temp = kmid_->next_;
-    while (temp != tail_) {
-      if (temp->is_evictable_) { /** 第二部分驱逐 */
-        fid = temp->fid_;
-        lruk_map_.erase(fid); /** 从哈希表中删除 */
-        MyRemove(temp);       /** 从链表中删除 */
-        delete temp;          /** 释放内存 */
-        curr_size_--;         /** 修改curr_size_的大小 */
-        latch_.unlock();      /** 退出前释放锁 */
-        return fid;
-      }
-      temp = temp->next_;
+  // 从冷队列驱逐（FIFO，从头部）
+  temp = cold_head_->next_;
+  while (temp != cold_tail_) {
+    if (temp->is_evictable_) {
+      frame_id_t fid = temp->fid_;
+      lruk_map_.erase(fid);
+      RemoveNode(temp);
+      delete temp;
+      curr_size_--;
+      return fid;
     }
+    temp = temp->next_;
   }
 
-  if (kmid_->prev_ != head_) { /** 第一部分链表 按LRU从kmid_->head_ */
-    temp = kmid_->prev_;
-
-    while (temp != head_) {
-      if (temp->is_evictable_) { /** 第一部分驱逐 */
-        fid = temp->fid_;
-        lruk_map_.erase(fid); /** 从哈希表中删除 */
-        MyRemove(temp);       /** 从链表中删除 */
-        delete temp;          /** 释放内存 */
-        curr_size_--;         /** 修改curr_size_的大小 */
-        latch_.unlock();      /** 退出前释放锁 */
-        return fid;
-      }
-      temp = temp->prev_;
+  // 从热队列驱逐（LRU，从尾部）
+  temp = hot_tail_->prev_;
+  while (temp != hot_head_) {
+    if (temp->is_evictable_) {
+      frame_id_t fid = temp->fid_;
+      lruk_map_.erase(fid);
+      RemoveNode(temp);
+      delete temp;
+      curr_size_--;
+      return fid;
     }
+    temp = temp->prev_;
   }
-  latch_.unlock(); /** 退出前释放锁 */
+
   return std::nullopt;
 }
 
-void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType access_type) {
-  latch_.lock();
+void LRUKReplacer::RecordAccess(frame_id_t frame_id, AccessType access_type) {
+  std::lock_guard<std::mutex> lock(latch_);
 
-  LRUKNode *temp = nullptr;
-  if (access_type == AccessType::Scan) {   /** 以scan类型第一次访问 */
-    if (lruk_map_.count(frame_id) != 0U) { /** 再次访问 */
-      temp = lruk_map_[frame_id];
-      temp->last_access_ = AccessType::Scan;
-      temp->accses_k_ = 1;
-      AddAftertail(MyRemove(temp));
-      BUSTUB_ASSERT(temp->last_access_ == AccessType::Scan, "连续两次以Scan方式访问");
+  if (access_type == AccessType::Scan) {
+    if (lruk_map_.count(frame_id) != 0U) {
+      LRUKNode *node = lruk_map_[frame_id];
+      RemoveNode(node);
+      node->access_count_ = 1;
+      node->last_access_ = AccessType::Scan;
+      AddToScanTail(node);
     } else {
-      temp = new LRUKNode(frame_id, AccessType::Scan);
-      AddAftertail(temp);
-      lruk_map_[frame_id] = temp;
+      LRUKNode *node = new LRUKNode(frame_id, AccessType::Scan);
+      AddToScanTail(node);
+      lruk_map_[frame_id] = node;
     }
-    latch_.unlock();
     return;
   }
 
-  if (lruk_map_.count(frame_id) != 0U) { /** 再次访问 */
-    temp = lruk_map_[frame_id];
-    if (temp->last_access_ == AccessType::Scan) { /** 在scan队列中 */
-      temp->last_access_ = AccessType::Unknown;
-      Add2head(MyRemove(temp));        /** 处理为第一次访问, 即加入第一部分链表 */
-    } else {                           /** 其余访问方式的 */
-      if (++(temp->accses_k_) >= k_) { /** 满足k_, 跨越kmid_ */
-        Add2head(MyRemove(temp));      /** 按照LRU方式加入第一部分链表 */
+  // 非扫描访问
+  if (lruk_map_.count(frame_id) != 0U) {
+    LRUKNode *node = lruk_map_[frame_id];
+    if (node->last_access_ == AccessType::Scan) {
+      RemoveNode(node);
+      node->last_access_ = access_type;
+      node->access_count_ = 1;
+      AddToColdTail(node);
+    } else {
+      node->access_count_++;
+      if (node->access_count_ >= k_) {
+        RemoveNode(node);
+        AddToHotHead(node);
       }
-      /** 对于以及小于k次的不动即可, 按FIFO处理 */
     }
-  } else {                         /** 新frame */
-    temp = new LRUKNode(frame_id); /** 开辟内存空间 */
-    Add2tail(temp);                /** 加入cold list */
-    lruk_map_[frame_id] = temp;    /** 加入哈希表 */
+  } else {
+    LRUKNode *node = new LRUKNode(frame_id, access_type);
+    AddToColdTail(node);
+    lruk_map_[frame_id] = node;
   }
-  latch_.unlock(); /** 退出前释放锁 */
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
-  latch_.lock();
-  BUSTUB_ASSERT(static_cast<size_t>(frame_id) <= replacer_size_ && frame_id >= 0, "frame_id error\n");
+  std::lock_guard<std::mutex> lock(latch_);
+  BUSTUB_ASSERT(static_cast<size_t>(frame_id) <= replacer_size_ && frame_id >= 0, "Invalid frame_id");
   if (lruk_map_.count(frame_id) == 0U) {
-    latch_.unlock(); /** 退出前释放锁 */
     return;
   }
 
-  LRUKNode *temp = lruk_map_[frame_id];
-
-  curr_size_ += (temp->is_evictable_ ^ set_evictable) != 0 ? (set_evictable ? 1 : -1) : 0; /** 维护可用frame */
-
-  temp->is_evictable_ = set_evictable; /** 修改该frame状态 */
-  latch_.unlock();                     /** 退出前释放锁 */
+  LRUKNode *node = lruk_map_[frame_id];
+  if (node->is_evictable_ != set_evictable) {
+    curr_size_ += set_evictable ? 1 : -1;
+    node->is_evictable_ = set_evictable;
+  }
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
-  latch_.lock();
+  std::lock_guard<std::mutex> lock(latch_);
   if (lruk_map_.count(frame_id) == 0U) {
-    latch_.unlock(); /** 退出前释放锁 */
     return;
   }
 
-  LRUKNode *temp = MyRemove(lruk_map_[frame_id]); /** 从链表中移除 */
-  lruk_map_.erase(frame_id);                      /** 从哈希表中移除 */
-  delete temp;                                    /** 释放内存空间 */
-  curr_size_--;                                   /** 维护可用frame*/
-  latch_.unlock();                                /** 退出前释放锁 */
+  LRUKNode *node = lruk_map_[frame_id];
+  BUSTUB_ASSERT(node->is_evictable_, "Cannot remove non-evictable frame");
+  RemoveNode(node);
+  lruk_map_.erase(frame_id);
+  delete node;
+  curr_size_--;
 }
 
-auto LRUKReplacer::Size() -> size_t { return curr_size_; }
-
-// void LRUKReplacer::debug_show(){
-//   latch_.lock();
-//   LRUKNode *temp = head_->next_;
-//   while(temp != tail_){
-//     if(temp != kmid_) {
-//       cout << "fid=" << temp->fid_ << " k=" << temp->accses_k_ << " " << temp->is_evictable_ << endl;
-//     }
-//     temp = temp->next_;
-//   }
-//   latch_.unlock();       /** 退出前释放锁 */
-// }
+auto LRUKReplacer::Size() -> size_t {
+  std::lock_guard<std::mutex> lock(latch_);
+  return curr_size_;
+}
 
 }  // namespace bustub
