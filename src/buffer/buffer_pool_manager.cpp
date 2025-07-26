@@ -115,7 +115,7 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
   auto promise = disk_scheduler_->CreatePromise();
   auto future = promise.get_future();
 
-  disk_scheduler_->Schedule({true, frame->GetDataMut(), page_id, std::move(promise)});
+  disk_scheduler_->Schedule({true, frame->GetDataMut(), page_id, std::move(promise)}, frame->frame_id_);
 
   while (!future.get()) {
   }
@@ -204,7 +204,7 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
     std::optional<std::future<bool>> future_opt = std::nullopt;
     if (dirty_old) {             // 避免另外一个线程分配frame从磁盘读page
       frame->is_dirty_ = false;  // Reset()
-      future_opt = WriteDisk(frame->GetDataMut(), dirty_page_id);
+      future_opt = WriteDisk(frame->GetDataMut(), dirty_page_id, frame->frame_id_);
     }
     bpm_latch_->unlock();
 
@@ -280,7 +280,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
     std::optional<std::future<bool>> future_opt = std::nullopt;
     if (dirty_old) {             // 避免另外一个线程分配frame从磁盘读page
       frame->is_dirty_ = false;  // Reset()
-      future_opt = WriteDisk(frame->GetDataMut(), dirty_page_id);
+      future_opt = WriteDisk(frame->GetDataMut(), dirty_page_id, frame->frame_id_);
     }
     bpm_latch_->unlock();
     /** 插队risk */
@@ -374,15 +374,15 @@ auto BufferPoolManager::GetPinCount(page_id_t page_id) -> std::optional<size_t> 
 void BufferPoolManager::ReadDisk(std::shared_ptr<FrameHeader> &frame) {
   auto promise = disk_scheduler_->CreatePromise();
   auto future = promise.get_future();
-  disk_scheduler_->Schedule({false, frame->GetDataMut(), frame->page_id_, std::move(promise)});
+  disk_scheduler_->Schedule({false, frame->GetDataMut(), frame->page_id_, std::move(promise)}, frame->frame_id_);
   while (!future.get()) {
   }
 }
 
-auto BufferPoolManager::WriteDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>> {  // NOLINT
+auto BufferPoolManager::WriteDisk(char *data, page_id_t page_id, frame_id_t frame_id) -> std::optional<std::future<bool>> {  // NOLINT
   auto promise = disk_scheduler_->CreatePromise();
   auto future = promise.get_future();
-  disk_scheduler_->Schedule({true, data, page_id, std::move(promise)});
+  disk_scheduler_->Schedule({true, data, page_id, std::move(promise)}, frame_id);
   return future;
 }
 
