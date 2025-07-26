@@ -124,7 +124,7 @@ class BufferPoolManager {
   std::atomic<uint64_t> access_cnt_;
 
  private:
-  const size_t num_frames_;
+  size_t num_frames_;
   std::atomic<page_id_t> next_page_id_;
   std::shared_ptr<std::mutex> bpm_latch_;
   std::vector<std::shared_ptr<FrameHeader>> frames_;

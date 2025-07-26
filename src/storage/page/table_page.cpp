@@ -34,7 +34,7 @@ auto TablePage::GetNextTupleOffset(const TupleMeta &meta, const Tuple &tuple) co
     auto &[offset, size, meta] = tuple_info_[num_tuples_ - 1];
     slot_end_offset = offset;
   } else {
-    slot_end_offset = BUSTUB_PAGE_SIZE; // first tuple
+    slot_end_offset = BUSTUB_PAGE_SIZE;  // first tuple
   }
   auto tuple_offset = slot_end_offset - tuple.GetLength();
   auto offset_size = TABLE_PAGE_HEADER_SIZE + TUPLE_INFO_SIZE * (num_tuples_ + 1);
@@ -52,7 +52,7 @@ auto TablePage::InsertTuple(const TupleMeta &meta, const Tuple &tuple) -> std::o
   auto tuple_id = num_tuples_;
   tuple_info_[tuple_id] = std::make_tuple(*tuple_offset, tuple.GetLength(), meta);
   num_tuples_++;
-  memcpy(page_start_ + *tuple_offset, tuple.data_.data(), tuple.GetLength()); // page_start_'s effect
+  memcpy(page_start_ + *tuple_offset, tuple.data_.data(), tuple.GetLength());  // page_start_'s effect
   return tuple_id;
 }
 

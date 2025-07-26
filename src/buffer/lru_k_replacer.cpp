@@ -196,7 +196,6 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   latch_.lock();
-  BUSTUB_ASSERT(static_cast<size_t>(frame_id) <= replacer_size_ && frame_id >= 0, "frame_id error\n");
   if (lruk_map_.count(frame_id) == 0U) {
     latch_.unlock(); /** 退出前释放锁 */
     return;

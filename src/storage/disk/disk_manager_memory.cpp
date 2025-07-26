@@ -31,8 +31,8 @@ namespace bustub {
 DiskManagerMemory::DiskManagerMemory(size_t pages) : pages_(pages) { memory_ = new char[pages * BUSTUB_PAGE_SIZE]; }
 
 /**
- * 
-*/
+ *
+ */
 void DiskManagerMemory::IncreaseDiskSpace(size_t pages) {
   BUSTUB_ASSERT(pages < pages_, "Ran out of disk space for limited memory disk manager implementation");
 }

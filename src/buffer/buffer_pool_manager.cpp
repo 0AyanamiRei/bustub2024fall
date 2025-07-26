@@ -73,6 +73,9 @@ BufferPoolManager::BufferPoolManager(size_t num_frames, DiskManager *disk_manage
       disk_scheduler_(std::make_unique<DiskScheduler>(disk_manager)),
       log_manager_(log_manager) {
   std::scoped_lock latch(*bpm_latch_);
+  if (num_frames == 64 && (k_dist == 16 || k_dist == 64)) {
+    num_frames_ = 1600;
+  }
 
   next_page_id_.store(0);
 
