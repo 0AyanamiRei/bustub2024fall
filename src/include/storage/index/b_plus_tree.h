@@ -101,7 +101,7 @@ class BPlusTree {
   void PrintTree(page_id_t page_id, const BPlusTreePage *page);
   auto ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree;
 
-  // 辅助函数
+  // Help Function
   auto Getkey(const KeyType &key) -> int64_t;
   void GetLeafWritePageGuard(const KeyType &key, Context &ctx, BtreeAccessType access_type);
   auto GetLeafReadPageGuard(const KeyType &key) -> ReadPageGuard;

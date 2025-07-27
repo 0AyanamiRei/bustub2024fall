@@ -235,7 +235,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
       frame->io_cv_.wait(io_lock, [frame] {return frame->io_done_.load(); });
       io_lock.unlock();
     }
-    frame->WLatch();
+    frame->RLatch();
     return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
   }
 
@@ -270,7 +270,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
       frame->io_cv_.notify_all();
       io_lock.unlock();
     }
-    frame->WLatch();
+    frame->RLatch();
     return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
   }
   bpm_latch_->unlock();
