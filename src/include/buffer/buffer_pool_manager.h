@@ -35,6 +35,9 @@ class BufferPoolManager;
 class ReadPageGuard;
 class WritePageGuard;
 
+constexpr bool WRITE = true;
+constexpr bool READ = false;
+
 /**
  * @brief A helper class for `BufferPoolManager` that manages a frame of memory and related metadata.
  *
@@ -80,6 +83,7 @@ class FrameHeader {
   std::atomic<size_t> pin_count_;
   std::vector<char> data_;
   std::mutex io_lock_;
+  std::mutex frame_latch_;
   std::atomic<bool> io_done_;
   std::condition_variable io_cv_;
 
@@ -134,8 +138,9 @@ class BufferPoolManager {
   std::unique_ptr<DiskScheduler> disk_scheduler_;
   LogManager *log_manager_ __attribute__((__unused__));
 
-  void ReadDisk(std::shared_ptr<FrameHeader> &frame);
-  auto WriteDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>>;
+  auto GetFrame(bool &is_evict) -> std::shared_ptr<FrameHeader>;
+  auto ReadFromDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>>;
+  auto WriteToDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>>;
   void SetFrame(std::shared_ptr<FrameHeader> &frame, frame_id_t &frame_id, page_id_t &page_id, AccessType &access_type);
 };
 }  // namespace bustub

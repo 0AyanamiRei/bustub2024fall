@@ -155,7 +155,7 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
   }
   bpm_latch_->lock();
   access_cnt_++;
-  /** case1: 缓存命中 */
+
   if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
     auto frame = frames_[p2f->second];
     { // maybe without bpm_latch_?
@@ -175,59 +175,39 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
     return WritePageGuard(page_id, frame, replacer_, bpm_latch_);
   }
 
-  
-
-  /** case2: 分配新的frames_ */
-  if (!free_frames_.empty()) {
-    auto frame_id = free_frames_.back();
-    free_frames_.pop_back();
-    auto frame_new = frames_[frame_id];
-    page_table_[page_id] = frame_id;
-    frame_new->Reset();
-    SetFrame(std::ref(frame_new), frame_id, page_id, access_type);
-    frame_new->io_done_.store(false); /** 设置IO标志:开始 */
-    bpm_latch_->unlock();
-    std::unique_lock<std::mutex> lock(frame_new->io_lock_);
-    ReadDisk(std::ref(frame_new));
-    frame_new->io_done_.store(true); /** 设置IO标志:结束 */
-    frame_new->io_cv_.notify_all();     /** 唤醒 */
-    lock.unlock();
-    frame_new->WLatch(); /** 带写锁IO */
-    WritePageGuard page_guard(page_id, frame_new, replacer_, bpm_latch_);
-    return page_guard;
-  }
-  /** case3: 驱逐frames_ */
-  std::optional<frame_id_t> frame_id_opt = replacer_->Evict();
-  if (frame_id_opt.has_value()) {
-    auto frame_id = frame_id_opt.value();
-    auto frame = frames_[frame_id];
+  bool is_evict;
+  if (auto frame = GetFrame(is_evict); frame != nullptr) {
     page_table_.erase(frame->page_id_);
-    page_table_[page_id] = frame_id;
-    page_id_t dirty_page_id = frame->page_id_;
-    bool dirty_old = frame->is_dirty_;
-    frame->pin_count_.store(0);  // Reset()
-    SetFrame(std::ref(frame), frame_id, page_id, access_type);
-    frame->io_done_.store(false); /** 设置IO标志:开始 */
-    std::optional<std::future<bool>> future_opt = std::nullopt;
-    if (dirty_old) {             // 避免另外一个线程分配frame从磁盘读page
-      frame->is_dirty_ = false;  // Reset()
-      future_opt = WriteDisk(frame->GetDataMut(), dirty_page_id);
+    page_table_[page_id] = frame->frame_id_; // add new map into page_table
+    auto dirty_page = frame->page_id_;
+    auto is_dirty = frame->is_dirty_;
+    { // maybe without bpm_latch_?
+      frame->pin_count_.store(1);
+      // std::fill(data_.begin(), data_.end(), 0);
+      frame->is_dirty_ = false;
+      frame->io_done_ = false; // for io following
+      frame->page_id_ = page_id;
+      replacer_->RecordAccess(frame->frame_id_, access_type);
+      replacer_->SetEvictable(frame->frame_id_, false);
+    }
+
+    std::optional<std::future<bool>> write_future = std::nullopt;
+    if (is_dirty) {
+      write_future = WriteToDisk(frame->GetDataMut(), dirty_page);
     }
     bpm_latch_->unlock();
 
-    std::unique_lock<std::mutex> lock(frame->io_lock_);
-    if (dirty_old) {
-      while (!future_opt.value().get()) {
-      }
+    { // start io
+      std::unique_lock<std::mutex> io_lock(frame->io_lock_);
+      if (write_future.has_value()) { write_future->wait(); }
+      auto read_future = ReadFromDisk(frame->GetDataMut(), page_id);
+      read_future->wait();
+      frame->io_done_.store(true);
+      frame->io_cv_.notify_all();
+      io_lock.unlock();
     }
-    std::fill(frame->data_.begin(), frame->data_.end(), 0);  // Reset()
-    ReadDisk(std::ref(frame));
-    frame->io_done_.store(true); /** 设置IO标志:结束 */
-    frame->io_cv_.notify_all();     /** 唤醒 */
-    lock.unlock();
-    frame->WLatch(); /** 带写锁IO */
-    WritePageGuard page_guard(page_id, frame, replacer_, bpm_latch_);
-    return page_guard;
+    frame->WLatch();
+    return WritePageGuard(page_id, frame, replacer_, bpm_latch_);
   }
   bpm_latch_->unlock();
   return std::nullopt;
@@ -239,71 +219,59 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
   }
   bpm_latch_->lock();
   access_cnt_++;
-  /** 缓存命中 */
-  if (page_table_.count(page_id) != 0U) {
-    bpm_hint_++;
-    auto frame_id = page_table_[page_id];
-    auto &frame_cached = frames_[frame_id];
-    SetFrame(std::ref(frame_cached), frame_id, page_id, access_type);
+
+  if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
+    auto frame = frames_[p2f->second];
+    { // maybe without bpm_latch_?
+      frame->pin_count_++;
+      frame->page_id_ = page_id;
+      replacer_->RecordAccess(p2f->second, access_type);
+      replacer_->SetEvictable(p2f->second, false);
+    }
     bpm_latch_->unlock();
-    std::unique_lock<std::mutex> lk(frame_cached->io_lock_);
-    frame_cached->io_cv_.wait(lk, [&frame_cached] { return frame_cached->io_done_.load(); });
-    lk.unlock();
-    frame_cached->RLatch();
-    ReadPageGuard page_guard(page_id, frame_cached, replacer_, bpm_latch_);
-    return page_guard;  // 隐式调用移动构造创建了std::optional<T>对象 详情见RVO优化
+
+    { // what wait for ?
+      std::unique_lock<std::mutex> io_lock(frame->io_lock_);
+      frame->io_cv_.wait(io_lock, [frame] {return frame->io_done_.load(); });
+      io_lock.unlock();
+    }
+    frame->WLatch();
+    return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
   }
-  /** 分配新的frames_ */
-  if (!free_frames_.empty()) {
-    auto frame_id = free_frames_.back();
-    free_frames_.pop_back();
-    auto frame_new = frames_[frame_id];
-    page_table_[page_id] = frame_id;
-    frame_new->Reset();
-    SetFrame(std::ref(frame_new), frame_id, page_id, access_type);
-    frame_new->io_done_.store(false); /** 设置IO标志:开始 */
-    bpm_latch_->unlock();
-    std::unique_lock<std::mutex> lock(frame_new->io_lock_);
-    ReadDisk(std::ref(frame_new));
-    frame_new->io_done_.store(true); /** 设置IO标志:结束 */
-    frame_new->io_cv_.notify_all();     /** 唤醒 */
-    lock.unlock();
-    frame_new->RLatch(); /** 带读锁IO */
-    ReadPageGuard page_guard(page_id, frame_new, replacer_, bpm_latch_);
-    return page_guard;
-  }
-  /** 驱逐frames_ */
-  std::optional<frame_id_t> frame_id_opt = replacer_->Evict();
-  if (frame_id_opt.has_value()) {
-    auto frame_id = frame_id_opt.value();
-    auto frame = frames_[frame_id];
+
+  bool is_evict;
+  if (auto frame = GetFrame(is_evict); frame != nullptr) {
     page_table_.erase(frame->page_id_);
-    page_table_[page_id] = frame_id;
-    page_id_t dirty_page_id = frame->page_id_;
-    bool dirty_old = frame->is_dirty_;
-    frame->pin_count_.store(0);  // Reset()
-    SetFrame(std::ref(frame), frame_id, page_id, access_type);
-    frame->io_done_.store(false); /** 设置IO标志:开始 */
-    std::optional<std::future<bool>> future_opt = std::nullopt;
-    if (dirty_old) {             // 避免另外一个线程分配frame从磁盘读page
-      frame->is_dirty_ = false;  // Reset()
-      future_opt = WriteDisk(frame->GetDataMut(), dirty_page_id);
+    page_table_[page_id] = frame->frame_id_; // add new map into page_table
+    auto dirty_page = frame->page_id_;
+    auto is_dirty = frame->is_dirty_;
+    { // maybe without bpm_latch_?
+      frame->pin_count_.store(1);
+      // std::fill(data_.begin(), data_.end(), 0);
+      frame->is_dirty_ = false;
+      frame->io_done_ = false; // for io following
+      frame->page_id_ = page_id;
+      replacer_->RecordAccess(frame->frame_id_, access_type);
+      replacer_->SetEvictable(frame->frame_id_, false);
+    }
+
+    std::optional<std::future<bool>> write_future = std::nullopt;
+    if (is_dirty) {
+      write_future = WriteToDisk(frame->GetDataMut(), dirty_page);
     }
     bpm_latch_->unlock();
-    /** 插队risk */
-    std::unique_lock<std::mutex> lock(frame->io_lock_);
-    if (dirty_old) {
-      while (!future_opt.value().get()) {
-      }
+
+    { // start io
+      std::unique_lock<std::mutex> io_lock(frame->io_lock_);
+      if (write_future.has_value()) { write_future->wait(); }
+      auto read_future = ReadFromDisk(frame->GetDataMut(), page_id);
+      read_future->wait();
+      frame->io_done_.store(true);
+      frame->io_cv_.notify_all();
+      io_lock.unlock();
     }
-    std::fill(frame->data_.begin(), frame->data_.end(), 0);  // Reset()
-    ReadDisk(std::ref(frame));
-    frame->io_done_.store(true); /** 设置IO标志:结束 */
-    frame->io_cv_.notify_all();     /** 唤醒 */
-    lock.unlock();
-    frame->RLatch(); /** 带读锁IO */
-    ReadPageGuard page_guard(page_id, frame, replacer_, bpm_latch_);
-    return page_guard;
+    frame->WLatch();
+    return ReadPageGuard(page_id, frame, replacer_, bpm_latch_);
   }
   bpm_latch_->unlock();
   return std::nullopt;
@@ -378,19 +346,36 @@ auto BufferPoolManager::GetPinCount(page_id_t page_id) -> std::optional<size_t> 
   return pin_cnt;
 }
 
-void BufferPoolManager::ReadDisk(std::shared_ptr<FrameHeader> &frame) {
+auto BufferPoolManager::ReadFromDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>> {  // NOLINT
   auto promise = disk_scheduler_->CreatePromise();
   auto future = promise.get_future();
-  disk_scheduler_->Schedule({false, frame->GetDataMut(), frame->page_id_, std::move(promise)});
-  while (!future.get()) {
-  }
+  disk_scheduler_->Schedule({READ, data, page_id, std::move(promise)});
+  return future;
 }
 
-auto BufferPoolManager::WriteDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>> {  // NOLINT
+auto BufferPoolManager::WriteToDisk(char *data, page_id_t page_id) -> std::optional<std::future<bool>> {  // NOLINT
   auto promise = disk_scheduler_->CreatePromise();
   auto future = promise.get_future();
-  disk_scheduler_->Schedule({true, data, page_id, std::move(promise)});
+  disk_scheduler_->Schedule({WRITE, data, page_id, std::move(promise)});
   return future;
+}
+
+auto BufferPoolManager::GetFrame(bool &is_evict) -> std::shared_ptr<FrameHeader> {
+  std::shared_ptr<FrameHeader> frame;
+  if (free_frames_.empty()) {
+    is_evict = true;
+    auto frame_id_opt = replacer_->Evict();
+    if (!frame_id_opt.has_value()) {
+      return nullptr;
+    }
+    frame = frames_[frame_id_opt.value()];
+  } else {
+      is_evict = false;
+      auto frame_id = free_frames_.front();
+      free_frames_.pop_front();
+      frame = frames_[frame_id];
+  }
+  return frame;
 }
 
 void BufferPoolManager::SetFrame(std::shared_ptr<FrameHeader> &frame, frame_id_t &frame_id, page_id_t &page_id,
