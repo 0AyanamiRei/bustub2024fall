@@ -123,7 +123,12 @@ class BufferPoolManager {
   auto FlushPage(page_id_t page_id) -> bool;
   void FlushAllPages();
   auto GetPinCount(page_id_t page_id) -> std::optional<size_t>;
+
   // 统计缓存命中率
+  void BpmMetricsBegin() {bpm_hint_.store(0), access_cnt_.store(0); }
+  void BpmMetricsReport() {
+    LOG_INFO("Cache hint: %ld/%ld", bpm_hint_.load(), access_cnt_.load());
+  }
   std::atomic<uint64_t> bpm_hint_;
   std::atomic<uint64_t> access_cnt_;
 

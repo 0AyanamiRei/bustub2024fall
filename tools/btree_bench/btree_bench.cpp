@@ -162,16 +162,11 @@ auto main(int argc, char **argv) -> int {
 
   fmt::print(stderr, "[info] benchmark start\n");
 
-  bpm->access_cnt_.store(0);
-  bpm->bpm_hint_.store(0);
-  index.split_cnt_.store(0);
-  index.merge_cnt_.store(0);
-  index.remove_cnt_.store(0);
-  index.remove_cnt_.store(0);
-  index.redistribute_cnt_.store(0);
-
   BTreeTotalMetrics total_metrics;
   total_metrics.Begin();
+  bpm->BpmMetricsBegin();
+  index.BTreeMetricsBegin();
+
 
   std::vector<std::thread> threads;
 
@@ -272,11 +267,8 @@ auto main(int argc, char **argv) -> int {
     thread.join();
   }
 
-  cout << "split: " << index.split_cnt_.load() << endl;
-  cout << "merge: " << index.merge_cnt_.load() << endl;
-  cout << "insert: " << index.insert_cnt_.load() << endl;
-  cout << "remove: " << index.remove_cnt_.load() << endl;
-  cout << "redistribute: " << index.redistribute_cnt_.load() << endl; 
+  bpm->BpmMetricsReport();
+  index.BTreeMetricsReport();
   total_metrics.Report();
 
   return 0;

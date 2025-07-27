@@ -181,7 +181,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::SplitLeaf(WritePageGuard &right_guard, MappingT
   auto *right_page = right_guard.AsMut<B_PLUS_TREE_LEAF_PAGE_TYPE>();
 
   int max_size = GetSize();
-  int left_nums = (GetMaxSize() + 1) / 2;
+  int left_nums = static_cast<int>(std::ceil((GetMaxSize() + 1) * 0.9));
   // pos=[0~max_size]
   int pos = BinarySearch(newkv.first, comparator);
   if (pos < GetSize() && comparator(array_[pos].first, newkv.first) == 0U) {

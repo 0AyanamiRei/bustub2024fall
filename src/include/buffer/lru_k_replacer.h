@@ -24,18 +24,15 @@
 
 namespace bustub {
 
-enum class AccessType { Unknown = 0, Lookup, Scan, Index };
+enum class AccessType { Unknown = 0, Lookup, Scan, Index_Leaf, Index_Internal};
 
-class LRUKNode {
+class LRUNode {
  public:
-  LRUKNode();
-  explicit LRUKNode(frame_id_t fid, AccessType access_type = AccessType::Unknown);
-
+  LRUNode();
+  explicit LRUNode(frame_id_t fid, bool is_evictable = true);
   frame_id_t fid_;
-  LRUKNode *next_, *prev_;
-  size_t accses_k_;
+  LRUNode *next_, *prev_;
   bool is_evictable_;
-  AccessType last_access_;
 };
 
 class LRUKReplacer {
@@ -108,30 +105,11 @@ class LRUKReplacer {
   auto Size() -> size_t;
 
  private:
-  /** @brief 在链表头添加 */
-  void Add2head(LRUKNode *temp);
-
-  /** @brief 在链表尾添加
-   * @warning 需要处理k=1的时候, lru-k此时等价于lru, 调用`add_beforeKmid()`
-   */
-  void Add2tail(LRUKNode *temp);
-
-  void AddAfterkmid(LRUKNode *temp);
-
-  void AddAftertail(LRUKNode *temp);
-
-  /** @brief 从链表中移除, 并返回 */
-  auto MyRemove(LRUKNode *temp) -> LRUKNode *;
-
-  void DebugShow();
-
-  std::unordered_map<frame_id_t, LRUKNode *> lruk_map_;
-  size_t curr_size_{0};
-  size_t replacer_size_;
-  size_t k_;
-  std::mutex latch_;
-
-  LRUKNode *head_, *kmid_, *tail_, *scan_;
+  std::list<LRUNode> node_list_;  // Doubly linked list to track LRU order
+  std::unordered_map<frame_id_t, std::list<LRUNode>::iterator> node_map_;  // Hash map for O(1) node lookup
+  std::mutex mutex_;  // Mutex for thread safety
+  size_t size_;  // Number of evictable pages
+  size_t capacity_;  // Maximum number of pages
 };
 
 }  // namespace bustub

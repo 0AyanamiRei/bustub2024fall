@@ -90,6 +90,22 @@ class BPlusTree {
   void RemoveFromFile(const std::filesystem::path &file_name);
   void BatchOpsFromFile(const std::filesystem::path &file_name);
 
+  void BTreeMetricsBegin() {
+    split_cnt_ = 0;
+    merge_cnt_ = 0;
+    redistribute_cnt_ = 0;
+    insert_cnt_ = 0;
+    remove_cnt_ = 0;
+  }
+
+  void BTreeMetricsReport() {
+    LOG_INFO("split:%ld", split_cnt_.load());
+    LOG_INFO("merge:%ld", merge_cnt_.load());
+    LOG_INFO("redistribute:%ld", redistribute_cnt_.load());
+    LOG_INFO("insert:%ld", insert_cnt_.load());
+    LOG_INFO("remove:%ld", remove_cnt_.load());
+  }
+
   std::atomic<int64_t> split_cnt_;
   std::atomic<int64_t> merge_cnt_;
   std::atomic<int64_t> redistribute_cnt_;

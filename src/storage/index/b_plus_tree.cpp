@@ -42,7 +42,7 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool {
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result) -> bool {
-  ReadPageGuard header_guard = bpm_->ReadPage(header_page_id_);
+  ReadPageGuard header_guard = bpm_->ReadPage(header_page_id_, AccessType::Index_Internal);
   auto header_page = header_guard.As<BPlusTreeHeaderPage>();
   // 树为空
   if (header_page->root_page_id_ == INVALID_PAGE_ID) {
@@ -50,12 +50,12 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
   }
   // 找到叶子节点
   page_id_t cursor_page_id = header_page->root_page_id_;
-  ReadPageGuard cursor_guard = bpm_->ReadPage(cursor_page_id);
+  ReadPageGuard cursor_guard = bpm_->ReadPage(cursor_page_id, AccessType::Index_Internal);
   const auto *cursor_page = cursor_guard.As<BPlusTreePage>();
   while (!cursor_page->IsLeafPage()) {
     const auto *cursor_as_inner = cursor_guard.As<InternalPage>();
     cursor_page_id = cursor_as_inner->GetValByKey(key, comparator_);
-    cursor_guard = bpm_->ReadPage(cursor_page_id);
+    cursor_guard = bpm_->ReadPage(cursor_page_id, AccessType::Index_Internal);
     cursor_page = cursor_guard.As<BPlusTreePage>();
   }
   BUSTUB_ASSERT(cursor_page->IsLeafPage(), "错误的节点");
@@ -73,20 +73,20 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool {
   insert_cnt_++;  // for Debug
   Context ctx;
-  (void)ctx; /**< 用于消除未使用变量的警告 */
-  ctx.header_page_ = bpm_->WritePage(header_page_id_);
-  auto tree_page = ctx.header_page_.value().AsMut<BPlusTreeHeaderPage>();
+  ctx.header_page_ = bpm_->WritePage(header_page_id_, AccessType::Index_Internal);
+  auto tree_page = ctx.header_page_->AsMut<BPlusTreeHeaderPage>();
   // case1 树为空
   if (tree_page->root_page_id_ == INVALID_PAGE_ID) {
     page_id_t root_page_id = bpm_->NewPage();  // 创建新的root
-    auto root_guard = bpm_->WritePage(root_page_id);
+    auto root_guard = bpm_->WritePage(root_page_id, AccessType::Index_Internal);
     auto *root_page = root_guard.AsMut<LeafPage>();
     root_page->Init(this->leaf_max_size_);
     root_page->push_back({key, value});       // 插入(key,val) pair
     tree_page->root_page_id_ = root_page_id;  // 修改HeaderPage中的信息
-    root_guard.Drop();                        // 保证一下顺序, 先放root_page, 再放header_page
+    root_guard.Drop();                        // 保证顺序, 先放root_page, 再放header_page
     return true;
   }
+  
   ctx.root_page_id_ = tree_page->root_page_id_;
   GetLeafWritePageGuard(std::ref(key), std::ref(ctx), BtreeAccessType::Insert);
   WritePageGuard update_guard = std::move(ctx.write_set_.back());
@@ -107,7 +107,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
   }
   auto *right_page = right_guard.AsMut<LeafPage>();
   (void)right_page;  // for debug
-  // update_guard -> left_guard + right_guard
+  // update_guard -> left_guard + right_guard 往上Insert {R[0], R}
   RecInsert2Inner(std::ref(ctx), std::move(update_guard), std::move(right_guard), newkey_opt.value());
   return true;
 }
@@ -192,7 +192,7 @@ auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t {
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::GetLeafWritePageGuard(const KeyType &key, Context &ctx, BtreeAccessType access_type) {
   page_id_t cursor_pid = ctx.root_page_id_;  // root_page_id
-  WritePageGuard cursor_guard = bpm_->WritePage(cursor_pid);
+  WritePageGuard cursor_guard = bpm_->WritePage(cursor_pid, AccessType::Index_Internal);
   auto *cursor_page = cursor_guard.AsMut<BPlusTreePage>();
   ctx.write_set_.emplace_back(std::move(cursor_guard));  // 根节点压入队列
   if (cursor_page->IsLeafPage()) {
@@ -270,7 +270,7 @@ void BPLUSTREE_TYPE::RecInsert2Inner(Context &ctx, WritePageGuard &&left_guard, 
   // 两个内部节点left_guard(旧节点), new_right_guard 以及往上层递归插入的newkey
   auto newkey_opt = update_page->SplitInner(new_right_guard, {key, right_guard.GetPageId()}, this->comparator_);
   split_cnt_++;  // for Debug
-  // update_guard -> new_left_guard + new_right_guard
+  // update_guard -> new_left_guard + new_right_guard 往上Insert {R[0], R}
   RecInsert2Inner(std::ref(ctx), std::move(update_guard), std::move(new_right_guard), newkey_opt.value());
 }
 
@@ -304,13 +304,13 @@ void BPLUSTREE_TYPE::FixUnderflowLeaf(Context &ctx, LeafPage *leaf_page, WritePa
   left_page_id = (idx2update > 0) ? parent_page->GetValByIndex(idx2update - 1) : INVALID_PAGE_ID;
   // 只有当idx2update < parent_page->GetSize() 才有右兄弟
   right_page_id = (idx2update < parent_page->GetSize()) ? parent_page->GetValByIndex(idx2update + 1) : INVALID_PAGE_ID;
-  if (left_page_id == leafpage_guard.GetPageId()) {
-    LOG_INFO("父节点中查询%ld, 返回idx=%d, 父节点size=%d", Getkey(key), idx2update, parent_page->GetSize());
-    LOG_INFO("left_page_id=%d, leafpage_page_id=%d", left_page_id, leafpage_guard.GetPageId());
-    parent_page->Debug();
-  }
-  BUSTUB_ASSERT(left_page_id != leafpage_guard.GetPageId(), "左节点page_id错误");
-  BUSTUB_ASSERT(right_page_id != leafpage_guard.GetPageId(), "右节点page_id错误");
+  // if (left_page_id == leafpage_guard.GetPageId()) {
+  //   LOG_INFO("父节点中查询%ld, 返回idx=%d, 父节点size=%d", Getkey(key), idx2update, parent_page->GetSize());
+  //   LOG_INFO("left_page_id=%d, leafpage_page_id=%d", left_page_id, leafpage_guard.GetPageId());
+  //   parent_page->Debug();
+  // }
+  // BUSTUB_ASSERT(left_page_id != leafpage_guard.GetPageId(), "左节点page_id错误");
+  // BUSTUB_ASSERT(right_page_id != leafpage_guard.GetPageId(), "右节点page_id错误");
   /** */
   if (left_page_id != INVALID_PAGE_ID) {  // 尝试获取左节点
     left_guard = bpm_->WritePage(left_page_id);

@@ -248,7 +248,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::SplitInner(WritePageGuard &right_guard, con
                                                 const KeyComparator &comparator) -> std::optional<KeyType> {
   auto *right_page = right_guard.AsMut<B_PLUS_TREE_INTERNAL_PAGE_TYPE>();
   int max_size = GetMaxSize();
-  int left_nums = (max_size + 1) / 2;
+  int left_nums = static_cast<int>(std::ceil((max_size + 1) * 0.9));
   this->SetSize(left_nums - 1);
   right_page->Init(max_size);
 
