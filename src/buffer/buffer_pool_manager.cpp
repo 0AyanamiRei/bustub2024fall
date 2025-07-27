@@ -76,13 +76,9 @@ BufferPoolManager::BufferPoolManager(size_t num_frames, DiskManager *disk_manage
   if (num_frames == 64 && (k_dist == 16 || k_dist == 64)) {
     num_frames_ = 1600;
   }
-
   next_page_id_.store(0);
-
   frames_.reserve(num_frames_);
-
   page_table_.reserve(num_frames_);
-
   for (size_t i = 0; i < num_frames_; i++) {
     frames_.push_back(std::make_shared<FrameHeader>(i));
     free_frames_.push_back(static_cast<int>(i));
@@ -160,19 +156,27 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
   bpm_latch_->lock();
   access_cnt_++;
   /** case1: 缓存命中 */
-  if (page_table_.count(page_id) != 0U) {
-    bpm_hint_++;
-    auto frame_id = page_table_[page_id];
-    auto &frame_cached = frames_[frame_id];
-    SetFrame(std::ref(frame_cached), frame_id, page_id, access_type);
+  if (auto p2f = page_table_.find(page_id); p2f != page_table_.end()) {
+    auto frame = frames_[p2f->second];
+    { // maybe without bpm_latch_?
+      frame->pin_count_++;
+      frame->page_id_ = page_id;
+      replacer_->RecordAccess(p2f->second, access_type);
+      replacer_->SetEvictable(p2f->second, false);
+    }
     bpm_latch_->unlock();
-    std::unique_lock<std::mutex> lk(frame_cached->io_lock_);
-    frame_cached->cv_.wait(lk, [frame_cached] { return frame_cached->io_done_.load(); });
-    lk.unlock();
-    frame_cached->WLatch();
-    WritePageGuard page_guard(page_id, frame_cached, replacer_, bpm_latch_);
-    return page_guard;  // 隐式调用移动构造创建了std::optional<T>对象 详情见RVO优化
+
+    { // what wait for ?
+      std::unique_lock<std::mutex> io_lock(frame->io_lock_);
+      frame->io_cv_.wait(io_lock, [frame] {return frame->io_done_.load(); });
+      io_lock.unlock();
+    }
+    frame->WLatch();
+    return WritePageGuard(page_id, frame, replacer_, bpm_latch_);
   }
+
+  
+
   /** case2: 分配新的frames_ */
   if (!free_frames_.empty()) {
     auto frame_id = free_frames_.back();
@@ -186,7 +190,7 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
     std::unique_lock<std::mutex> lock(frame_new->io_lock_);
     ReadDisk(std::ref(frame_new));
     frame_new->io_done_.store(true); /** 设置IO标志:结束 */
-    frame_new->cv_.notify_all();     /** 唤醒 */
+    frame_new->io_cv_.notify_all();     /** 唤醒 */
     lock.unlock();
     frame_new->WLatch(); /** 带写锁IO */
     WritePageGuard page_guard(page_id, frame_new, replacer_, bpm_latch_);
@@ -219,7 +223,7 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
     std::fill(frame->data_.begin(), frame->data_.end(), 0);  // Reset()
     ReadDisk(std::ref(frame));
     frame->io_done_.store(true); /** 设置IO标志:结束 */
-    frame->cv_.notify_all();     /** 唤醒 */
+    frame->io_cv_.notify_all();     /** 唤醒 */
     lock.unlock();
     frame->WLatch(); /** 带写锁IO */
     WritePageGuard page_guard(page_id, frame, replacer_, bpm_latch_);
@@ -243,7 +247,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
     SetFrame(std::ref(frame_cached), frame_id, page_id, access_type);
     bpm_latch_->unlock();
     std::unique_lock<std::mutex> lk(frame_cached->io_lock_);
-    frame_cached->cv_.wait(lk, [&frame_cached] { return frame_cached->io_done_.load(); });
+    frame_cached->io_cv_.wait(lk, [&frame_cached] { return frame_cached->io_done_.load(); });
     lk.unlock();
     frame_cached->RLatch();
     ReadPageGuard page_guard(page_id, frame_cached, replacer_, bpm_latch_);
@@ -262,7 +266,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
     std::unique_lock<std::mutex> lock(frame_new->io_lock_);
     ReadDisk(std::ref(frame_new));
     frame_new->io_done_.store(true); /** 设置IO标志:结束 */
-    frame_new->cv_.notify_all();     /** 唤醒 */
+    frame_new->io_cv_.notify_all();     /** 唤醒 */
     lock.unlock();
     frame_new->RLatch(); /** 带读锁IO */
     ReadPageGuard page_guard(page_id, frame_new, replacer_, bpm_latch_);
@@ -295,7 +299,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
     std::fill(frame->data_.begin(), frame->data_.end(), 0);  // Reset()
     ReadDisk(std::ref(frame));
     frame->io_done_.store(true); /** 设置IO标志:结束 */
-    frame->cv_.notify_all();     /** 唤醒 */
+    frame->io_cv_.notify_all();     /** 唤醒 */
     lock.unlock();
     frame->RLatch(); /** 带读锁IO */
     ReadPageGuard page_guard(page_id, frame, replacer_, bpm_latch_);

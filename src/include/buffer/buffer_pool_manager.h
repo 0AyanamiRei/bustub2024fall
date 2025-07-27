@@ -81,7 +81,7 @@ class FrameHeader {
   std::vector<char> data_;
   std::mutex io_lock_;
   std::atomic<bool> io_done_;
-  std::condition_variable cv_;
+  std::condition_variable io_cv_;
 
   void WLatch() { rwlatch_.lock(); }
   void WUnLatch() { rwlatch_.unlock(); }

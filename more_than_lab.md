@@ -104,6 +104,26 @@ why not mmap?
 缓存page淘汰策略 lru和clock, 主要问题是 `sequential flooding`
 
 
+## index
+
+### ***flash note day4***
+
+
+## query
+
+### ***flash note day5***
+
+**pipeline breaker**: is an operator that cannot finish until all its children emit all their tuples.
+
+**Iterator Model**
+
+每个操作符都需要实现 `Next()`, `Open()`, `Close()`, 
+
+**Vectorized / Batch Model**
+
+同样需要实现`Next()...`, 但是每次会emit一个batch的数据
+
+
 ## 调优记录
 
 提交文件:
