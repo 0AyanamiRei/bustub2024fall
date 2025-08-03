@@ -108,6 +108,7 @@ why not mmap?
 
 ### ***flash note day4***
 
+...
 
 ## query
 
@@ -122,6 +123,26 @@ why not mmap?
 **Vectorized / Batch Model**
 
 同样需要实现`Next()...`, 但是每次会emit一个batch的数据
+
+
+1. QO : rules
+2. QO : cost-based serch
+    - cost-based, bottom-up QO，经典的“IBM SYS R optimizer”
+    - 
+
+优化器的两大分类：
+  1. Generative / Bottom-Up： System R，Postgres
+  2. Transformation / Top-Down：Volcano, Cascades架构
+
+在bustub中：
+
+```sh
+cd build && make -j$(nproc) shell
+./bin/bustub-shell
+```
+
+
+
 
 
 ## 调优记录

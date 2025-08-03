@@ -284,10 +284,10 @@ auto BusTubInstance::ExecuteSqlTxn(const std::string &sql, ResultWriter &writer,
 
   std::shared_lock<std::shared_mutex> l(catalog_lock_);
   bustub::Binder binder(*catalog_);
-  binder.ParseAndSave(sql);
+  binder.ParseAndSave(sql); // 先采用用PgParser解析成parse_tree
   l.unlock();
 
-  /**< 开始执行? @todo 查看statement的结构 */
+  // 按sql输入的";"划分, 一个语句为一个stmt
   for (auto *stmt : binder.statement_nodes_) {
     auto statement = binder.BindStatement(stmt);
 

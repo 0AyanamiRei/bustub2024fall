@@ -83,7 +83,7 @@ auto main(int argc, char **argv) -> int {
       }
       std::string line_prompt = first_line ? context_prompt : "... ";
       if (!disable_tty) {
-        char *query_c_str = linenoise(line_prompt.c_str());
+        char *query_c_str = linenoise(line_prompt.c_str()); // 解析输入
         if (query_c_str == nullptr) {
           return 0;
         }
@@ -116,7 +116,7 @@ auto main(int argc, char **argv) -> int {
 
     try {
       auto writer = bustub::FortTableWriter();
-      bustub->ExecuteSql(query, writer);
+      bustub->ExecuteSql(query, writer); // 执行query的入口
       for (const auto &table : writer.tables_) {
         std::cout << table << std::flush;
       }

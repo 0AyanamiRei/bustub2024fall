@@ -44,7 +44,7 @@
 namespace bustub {
 
 void Binder::SaveParseTree(duckdb_libpgquery::PGList *tree) {
-  std::vector<std::unique_ptr<BoundStatement>> statements;
+  std::vector<std::unique_ptr<BoundStatement>> statements; // ??
   for (auto entry = tree->head; entry != nullptr; entry = entry->next) {
     statement_nodes_.push_back(reinterpret_cast<duckdb_libpgquery::PGNode *>(entry->data.ptr_value));
   }
